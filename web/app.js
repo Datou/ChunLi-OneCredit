@@ -5,10 +5,10 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=15";
-import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=25";
-import { actionLabels } from "./actions.js?v=25";
-import { withDeadline } from "./assets.js?v=25";
-import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=25";
+import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=26";
+import { actionLabels } from "./actions.js?v=26";
+import { withDeadline } from "./assets.js?v=26";
+import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=26";
 
 const NATIVE = { w: 256, h: 200 }; // game pixels after the standard crop
 const FRAME_MS = 1000 / 59.92274340431231;

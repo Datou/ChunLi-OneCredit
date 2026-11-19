@@ -1,4 +1,4 @@
-import { t } from "./i18n.js?v=25";
+import { t } from "./i18n.js?v=26";
 
 /** Download an asset, timing out stalled connections and allowing slow transfers. */
 export async function download(url, { signal, onProgress, idleMs = 25_000 } = {}) {
@@ -18,7 +18,14 @@ export async function download(url, { signal, onProgress, idleMs = 25_000 } = {}
     keepAlive();
     if (!response.body) return new Uint8Array(await response.arrayBuffer());
 
-    const total = Number(response.headers.get("content-length"));
+    // GitHub Pages can serve these assets compressed; fetch decodes the body,
+    // so Content-Length would describe the encoded size and make the progress
+    // bar finish early.  Only trust it for identity responses.
+    const encoding = response.headers.get("content-encoding");
+    const declared = Number(response.headers.get("content-length"));
+    const total = !encoding || encoding === "identity"
+      ? (Number.isFinite(declared) ? declared : 0)
+      : 0;
     const reader = response.body.getReader();
     const chunks = [];
     let bytes = 0;
