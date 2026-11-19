@@ -5,19 +5,21 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=15";
-import { FIXTURE_VERSION, LiveSession } from "./live.js?v=19";
-import { ACTION_LABELS } from "./actions.js?v=10";
+import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=24";
+import { actionLabels } from "./actions.js?v=24";
+import { withDeadline } from "./assets.js?v=24";
+import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=24";
 
 const NATIVE = { w: 256, h: 200 }; // game pixels after the standard crop
 const FRAME_MS = 1000 / 59.92274340431231;
 const MAX_CATCHUP_FRAMES = 3;
 
 const RENDERS = [
-  { label: "256×200（1×）", r: 1 },
-  { label: "512×400（2×）", r: 2 },
-  { label: "768×600（3×）", r: 3 },
-  { label: "1024×800（4×）", r: 4 },
-  { label: "1536×1200（6×）", r: 6 },
+  { label: "256×200 (1×)", r: 1 },
+  { label: "512×400 (2×)", r: 2 },
+  { label: "768×600 (3×)", r: 3 },
+  { label: "1024×800 (4×)", r: 4 },
+  { label: "1536×1200 (6×)", r: 6 },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -27,7 +29,6 @@ const el = {
   stage: $("stage"),
   gate: $("gate"),
   note: $("note"),
-  model: null,
   res: $("resSelect"),
   plToggle: $("plToggle"),
   settings: $("settings"),
@@ -38,11 +39,24 @@ const el = {
   vDedither: $("vDedither"),
   vSoften: $("vSoften"),
   openSettings: $("openSettings"),
+  langToggle: $("langToggle"),
   closeSettings: $("closeSettings"),
   backdrop: $("backdrop"),
   drawer: $("drawer"),
   romFile: $("romFile"),
+  gateTitle: $("gateTitle"),
+  romSummary: $("romSummary"),
   romStatus: $("romStatus"),
+  romName: $("romName"),
+  romDetail: $("romDetail"),
+  launch: $("launch"),
+  launchLabel: $("launchLabel"),
+  launchBar: $("launchBar"),
+  launchPercent: $("launchPercent"),
+  launchHint: $("launchHint"),
+  launchError: $("launchError"),
+  launchTasks: { core: $("launchCore"), stage: $("launchStage"), model: $("launchModel") },
+  retryLaunch: $("retryLaunch"),
   battleStatus: $("battleStatus"),
   actionLabel: $("actionLabel"),
   activeDelay: $("activeDelay"),
@@ -70,11 +84,71 @@ const state = {
   romBytes: null,
   session: null,
   busy: false,
+  validating: false,
+  warm: false,
+  warming: false,
   nextFrame: null,
   needsDraw: true,
   keyHeld: false,
   pointerHeld: false,
 };
+
+// Runtime text, kept as message keys so switching language re-renders it.
+const view = {
+  gateTitle: { key: "gate.title", params: {} },
+  launchLabel: { key: "launch.label.start", params: {} },
+  launchHint: { key: "launch.hint.default", params: {} },
+  launchError: null,
+  rom: null,
+  tasks: {},
+};
+
+function renderGateTitle() {
+  el.gateTitle.textContent = t(view.gateTitle.key, view.gateTitle.params);
+}
+
+function setGateTitle(key, params = {}) {
+  view.gateTitle = { key, params };
+  renderGateTitle();
+}
+
+function setLaunchLabel(key, params = {}) {
+  view.launchLabel = { key, params };
+  el.launchLabel.textContent = t(key, params);
+}
+
+function setLaunchHint(key, params = {}) {
+  view.launchHint = { key, params };
+  el.launchHint.textContent = t(key, params);
+}
+
+function renderLaunchError() {
+  const error = view.launchError;
+  if (!error) return;
+  el.launchError.textContent = t(error.key, error.params);
+  el.launchError.hidden = el.retryLaunch.hidden = false;
+}
+
+function renderRom() {
+  const rom = view.rom;
+  if (!rom) return;
+  el.romSummary.hidden = false;
+  el.romSummary.dataset.status = rom.status;
+  el.romStatus.textContent = t(rom.key, rom.params);
+  el.romName.textContent = rom.file.name;
+  el.romName.title = rom.file.name;
+  const detail = rom.detailKey ? t(rom.detailKey, rom.detailParams) : "";
+  el.romDetail.textContent = detail;
+  el.romDetail.hidden = !detail;
+}
+
+function renderTasks() {
+  for (const [task, row] of Object.entries(view.tasks)) {
+    const item = el.launchTasks[task];
+    item.dataset.status = row.status;
+    item.textContent = t(row.key, row.params);
+  }
+}
 
 // ------------------------------------------------------------------ WebGL
 function initGL() {
@@ -186,7 +260,7 @@ function startLoop() {
         }
       } catch (err) {
         el.note.className = "note warn";
-        el.note.textContent = `实时运行出错：${err.message || err}`;
+        el.note.textContent = t("runtime.error", { message: err.message || err });
         state.session.dispose();
         state.session = null;
         syncBattleControls();
@@ -202,18 +276,21 @@ function startLoop() {
 
 function updateLiveStatus(last) {
   if (!state.session) return;
+  if (last) state.lastAction = last.action;
   const s = state.session.stats;
   const hp = value => value >= 0xff00 ? 0 : value;
   const parts = [
-    `HP ${hp(state.session.p1hp)} : ${hp(state.session.p2hp)}`,
-    `KO ${s.p2KO} : ${s.p1KO}`,
-    `${s.frames.toLocaleString()} 帧`,
+    t("note.hp", { p1: hp(state.session.p1hp), p2: hp(state.session.p2hp) }),
+    t("note.ko", { p1: s.p2KO, p2: s.p1KO }),
+    t("note.frames", { n: s.frames.toLocaleString() }),
   ];
-  if (state.session.inputPaused) el.actionLabel.textContent = "输入已切断";
-  else if (last) el.actionLabel.textContent = ACTION_LABELS[last.action];
+  if (state.session.inputPaused) el.actionLabel.textContent = t("note.inputPaused");
+  else if (state.lastAction !== undefined) el.actionLabel.textContent = actionLabels(getLang())[state.lastAction];
   const delay = state.session.baseDelay;
   const queued = state.session.fifo.lastDelay;
-  el.activeDelay.textContent = queued > delay ? `${delay} 帧 · 最近排队 ${queued} 帧` : `${delay} 帧`;
+  el.activeDelay.textContent = queued > delay
+    ? t("delay.queued", { n: delay, q: queued })
+    : t("delay.base", { n: delay });
   el.note.className = "note";
   const detail = parts.join(" · ");
   if (el.note.textContent !== detail) el.note.textContent = detail;
@@ -222,10 +299,13 @@ function updateLiveStatus(last) {
 function syncBattleControls() {
   el.battleStatus.hidden = !state.session;
   el.fullscreen.disabled = !state.session;
-  const audio = state.session?.audio?.ctx;
-  el.sound.hidden = !audio || audio.state === "running";
-  el.restart.disabled = state.busy || !state.romBytes;
-  el.stageSelect.disabled = state.busy;
+  const session = state.session;
+  el.sound.hidden = !session || !window.AudioContext || !!session.pendingAudio
+    || session.audio?.ctx.state === "running";
+  const loading = state.busy || state.validating;
+  el.romFile.disabled = loading;
+  el.restart.disabled = loading || !state.romBytes;
+  el.stageSelect.disabled = loading;
 }
 
 function syncInputHold() {
@@ -269,15 +349,15 @@ const ROM_SPEC = {
   size: 3145728,
   sha256: "d9224423c80754a4ee945f7348d7478d56a134654a9389e02cd82caab76dddef",
 };
+const fixtureUrlFor = (stage) => `cores/fixtures/ladder/${stage}.state.gz?v=${FIXTURE_VERSION}`;
 
-function romError(html) {
-  el.romStatus.hidden = false;
-  el.romStatus.className = "rom-status warn";
-  el.romStatus.innerHTML = html;
+function showRomStatus(file, key, params = {}, status = "pending", detailKey = null, detailParams = {}) {
+  view.rom = { file, key, params, status, detailKey, detailParams };
+  renderRom();
 }
 
 async function sha256Hex(buffer) {
-  if (!crypto?.subtle) return null;
+  if (!globalThis.crypto?.subtle) return null;
   const digest = await crypto.subtle.digest("SHA-256", buffer);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -288,39 +368,148 @@ function escapeHtml(s) {
 
 /** Pick a ROM: verify it, then start the fight straight away. */
 async function handleRom(file) {
-  if (!file) return;
-  el.romStatus.hidden = true;
-  el.romStatus.className = "rom-status";
+  if (!file || state.busy || state.validating) return;
+  el.launch.hidden = true;
+  setGateTitle("gate.title");
+  showRomStatus(file, "rom.verifying");
+  if (file.size !== ROM_SPEC.size) {
+    showRomStatus(file, "rom.mismatch", {}, "error", "rom.badSize.detail", {
+      size: file.size.toLocaleString(),
+      required: ROM_SPEC.size.toLocaleString(),
+    });
+    syncBattleControls();
+    return;
+  }
 
-  let bytes, hex;
+  state.validating = true;
+  syncBattleControls();
+  let verified = false;
   try {
-    bytes = new Uint8Array(await file.arrayBuffer());
-    hex = await sha256Hex(bytes);
+    const data = await withDeadline(file.arrayBuffer(), 15_000, t("rom.readTimeout"));
+    const bytes = new Uint8Array(data);
+    const hex = await withDeadline(sha256Hex(bytes), 15_000, t("rom.shaTimeout"));
+    if (!hex) {
+      showRomStatus(file, "rom.unverified", {}, "error", "rom.noCrypto.detail");
+      return;
+    }
+    if (hex !== ROM_SPEC.sha256) {
+      showRomStatus(file, "rom.mismatch", {}, "error", "rom.badHash.detail", {
+        name: ROM_SPEC.name,
+        expected: ROM_SPEC.sha256,
+        actual: hex,
+      });
+      return;
+    }
+    state.romBytes = bytes;
+    state.rom = { name: file.name, size: file.size, hash: hex };
+    verified = true;
+    showRomStatus(file, "rom.ok", {}, "ok");
   } catch (err) {
-    romError(`<b>读不了这个文件</b>：${escapeHtml(String(err.message || err))}`);
-    return;
+    showRomStatus(file, "rom.unreadable", {}, "error", "error.raw", { message: String(err.message || err) });
+  } finally {
+    state.validating = false;
+    syncBattleControls();
   }
+  // Only a ROM verified just now starts a load; a failed attempt must not
+  // silently restart the battle with a previously verified one.
+  if (verified) await startBattle();
+}
 
-  if (!hex) {
-    romError("<b>这个浏览器无法计算 sha256</b>（需要安全上下文 HTTPS 或 localhost），换用 Chrome / Edge 再试。");
-    return;
+// Rough byte sizes of the three launch downloads: they weight the overall bar
+// before Content-Length arrives, and keep it honest for tiny files.
+const TASK_EXPECTED = { core: 3_004_000, stage: 48_000, model: 13_614_320 };
+const taskBytes = Object.fromEntries(
+  Object.entries(TASK_EXPECTED).map(([task, total]) => [task, { got: 0, total }]),
+);
+
+function showTask(task, key, params = {}, status = "pending", progress = null) {
+  view.tasks[task] = { key, params, status };
+  el.launchTasks[task].dataset.status = status;
+  el.launchTasks[task].textContent = t(key, params);
+  const bytes = taskBytes[task];
+  if (progress) {
+    bytes.got = progress.got;
+    if (progress.total > 0) bytes.total = progress.total;
   }
+  if (status === "ok") bytes.got = bytes.total;
+  refreshProgress();
+}
 
-  if (hex !== ROM_SPEC.sha256) {
-    const sizeNote = file.size === ROM_SPEC.size ? "" : `，大小 ${fmtBytes(file.size)} 也不对（应为 3.00 MB）`;
-    romError([
-      "<b>ROM 与要求的不一致</b>",
-      `你选的是：${escapeHtml(file.name)}${sizeNote}`,
-      `实际 sha256：<code>${hex}</code>`,
-      `需要：<code>${ROM_SPEC.sha256}</code>`,
-      `对应文件：<code>${ROM_SPEC.name}</code>`,
-    ].join("<br>"));
-    return;
+/** Weighted overall bar so the 13 MB policy does not look like a new stall. */
+function refreshProgress() {
+  let got = 0;
+  let total = 0;
+  for (const bytes of Object.values(taskBytes)) {
+    got += Math.min(bytes.got, bytes.total);
+    total += bytes.total;
   }
+  // Hold 1% back while a launch is running, so "100%" never sits there.
+  const cap = state.busy ? 99 : 100;
+  const pct = total > 0 ? Math.min(cap, Math.round((got / total) * 100)) : 0;
+  el.launchBar.value = pct;
+  el.launchPercent.textContent = `${pct}%`;
+}
 
-  state.romBytes = bytes;
-  state.rom = { name: file.name, size: file.size, hash: hex };
-  await startBattle();
+/** One row of the launch table: "download with bytes" -> "ready" or the error. */
+function runTask(task, work, { signal, abort } = {}) {
+  showTask(task, "task.loading");
+  const onProgress = (bytes, total) => {
+    if (signal?.aborted) return;
+    const progress = total > 0 ? `${fmtBytes(bytes)} / ${fmtBytes(total)}` : fmtBytes(bytes);
+    showTask(task, "task.downloading", { progress }, "pending", { got: bytes, total });
+  };
+  return work(onProgress).then(
+    () => { if (!signal?.aborted) showTask(task, "task.ready", {}, "ok"); },
+    (error) => {
+      if (!signal?.aborted) {
+        showTask(task, "error.raw", { message: String(error.message || error) }, "error");
+        abort?.(error);
+      }
+      throw error;
+    },
+  );
+}
+
+/**
+ * Warm the emulator, the current stage save and the policy while the visitor is
+ * still looking for the ROM. Nothing is shown while this runs: the launch table
+ * is only revealed once a ROM is picked. live.js shares these promises with
+ * startBattle, so whichever path runs second reuses the first one's work.
+ */
+async function warmUp() {
+  if (navigator.connection?.saveData) return;     // respect data-saver
+  state.warming = true;
+  for (const task of Object.keys(el.launchTasks)) showTask(task, "task.wait");
+  try {
+    await Promise.all([
+      runTask("core", onProgress => prepareCore("cores/", { onProgress })),
+      runTask("stage", onProgress => prepareFixture(fixtureUrlFor(el.stageSelect.value), { onProgress })),
+      runTask("model", onProgress => preparePolicy("models/", { onProgress })),
+    ]);
+    state.warm = true;
+  } catch (error) {
+    // Keep the page usable; selecting a ROM retries only what is missing.
+    state.warm = false;
+    console.warn("预载失败", error);
+  } finally {
+    state.warming = false;
+  }
+}
+
+async function startAudio(session) {
+  try {
+    const setup = session.initAudio();
+    syncBattleControls();
+    await setup;
+    if (state.session !== session) return;
+    const ctx = session.audio?.ctx;
+    if (ctx) ctx.onstatechange = syncBattleControls;
+    session.resumeAudio().catch(error => console.warn("音频启动失败", error));
+  } catch (error) {
+    console.warn("音频初始化失败", error);
+  } finally {
+    syncBattleControls();
+  }
 }
 
 /**
@@ -328,49 +517,84 @@ async function handleRom(file) {
  * the stage picker both call this directly, so no extra button is needed.
  */
 async function startBattle() {
-  if (!state.romBytes || state.busy) return;
+  if (!state.romBytes || state.busy || state.validating) return;
   state.busy = true;
   state.session?.dispose?.();
   state.session = null;
+  state.lastAction = undefined;
   clearInputHold();
   syncBattleControls();
 
-  el.romStatus.hidden = true;
-  el.romStatus.className = "rom-status";
-  el.note.className = "note";
-  el.note.textContent = "启动模拟器并载入策略…";
+  el.gate.classList.remove("hidden");
+  setGateTitle("gate.starting");
+  el.launch.hidden = false;
+  setLaunchLabel("launch.label.start");
+  setLaunchHint("launch.hint.start");
+  el.launchError.hidden = el.retryLaunch.hidden = true;
+  view.launchError = null;
+  el.note.textContent = "";
+  if (!state.warm && !state.warming) {
+    for (const [task, bytes] of Object.entries(taskBytes)) {
+      bytes.got = 0;
+      bytes.total = TASK_EXPECTED[task];
+    }
+    for (const task of Object.keys(el.launchTasks)) showTask(task, "task.wait");
+  }
 
+  const controller = new AbortController();
+  const { signal } = controller;
+  const loadTask = (task, work) => runTask(task, work, {
+    signal,
+    abort: error => controller.abort(error),
+  });
   let sess;
   try {
+    if (!state.gl) throw new Error(t("webgl.noContext"));
     const stage = el.stageSelect ? el.stageSelect.value : "stage01";
     // The .gz fixtures are regenerated in place, so version their URL or a
     // browser may keep serving a stale save (which looks like a broken stage).
-    const fixtureUrl = `cores/fixtures/ladder/${stage}.state.gz?v=${FIXTURE_VERSION}`;
+    const fixtureUrl = fixtureUrlFor(stage);
     sess = new LiveSession({ fixtureUrl });
-    await sess.loadCore();
-    await sess.loadRom(state.romBytes);
-    const fixtureOk = await sess.loadFixture();
-    await sess.loadPolicy();
+    await Promise.all([
+      (async () => {
+        await loadTask("core", async onProgress => {
+          await sess.loadCore({ signal, onProgress });
+          await sess.loadRom(state.romBytes);
+        });
+        if (signal.aborted) throw signal.reason;
+        await loadTask("stage", async onProgress => {
+          sess.stats.fixture = await sess.loadFixture(fixtureUrl, { signal, onProgress });
+        });
+      })(),
+      loadTask("model", onProgress => sess.loadPolicy({ signal, onProgress })),
+    ]);
     await sess.initObserver();
-    await sess.initAudio().catch(error => console.warn("音频初始化失败", error));
-    sess.resumeAudio().catch(error => console.warn("音频启动失败", error));
-    sess.audio?.ctx.addEventListener("statechange", syncBattleControls);
 
-    sess.stats.fixture = fixtureOk;
     state.session = sess;
     state.nextFrame = null;
     state.needsDraw = true;
     sess.setDelay(Number(el.delayFrames.value));
     sess.setJitter(Number(el.jitterP.value));
+    el.launch.hidden = true;
     el.gate.classList.add("hidden");
     el.actionLabel.textContent = "—";
     syncInputHold();
     if (!el.drawer.classList.contains("open")) el.stage.focus({ preventScroll: true });
+    startAudio(sess);
   } catch (err) {
+    controller.abort(err);
     sess?.dispose();
-    el.gate.classList.remove("hidden");
-    el.note.textContent = "";
-    romError(`<b>启动失败</b>：${escapeHtml(String(err.message || err))}`);
+    for (const [task, item] of Object.entries(el.launchTasks)) {
+      if (item.dataset.status === "pending") showTask(task, "task.stopped");
+    }
+    const taskError = Object.values(el.launchTasks).some(item => item.dataset.status === "error");
+    setGateTitle(taskError ? "gate.failed" : "gate.title");
+    setLaunchLabel("launch.label.failed");
+    setLaunchHint(taskError ? "launch.hint.failed" : "launch.hint.stopped");
+    view.launchError = taskError
+      ? { key: "launch.error.retry", params: {} }
+      : { key: "error.raw", params: { message: String(err.message || err) } };
+    renderLaunchError();
   } finally {
     state.busy = false;
     syncBattleControls();
@@ -378,7 +602,43 @@ async function startBattle() {
 }
 
 // ------------------------------------------------------------------- boot
+function currentLanguageButton() {
+  el.langToggle.textContent = getLang() === "zh" ? "EN" : "中文";
+  el.langToggle.setAttribute("aria-label", t("lang.switch"));
+}
+
+/** Re-render the text that lives outside the static data-i18n attributes. */
+function renderDynamic() {
+  renderGateTitle();
+  renderLaunchLabels();
+  renderRom();
+  renderTasks();
+  renderLaunchError();
+  if (state.session) updateLiveStatus();
+  else el.activeDelay.textContent = t("delay.base", { n: 0 });
+}
+
+function renderLaunchLabels() {
+  el.launchLabel.textContent = t(view.launchLabel.key, view.launchLabel.params);
+  el.launchHint.textContent = t(view.launchHint.key, view.launchHint.params);
+}
+
 async function boot() {
+  applyI18n();
+  currentLanguageButton();
+  el.activeDelay.textContent = t("delay.base", { n: 0 });
+  onLangChange(() => {
+    currentLanguageButton();
+    renderDynamic();
+  });
+  el.langToggle.addEventListener("click", () => setLang(getLang() === "zh" ? "en" : "zh"));
+
+  el.romFile.addEventListener("change", () => {
+    const file = el.romFile.files?.[0];
+    el.romFile.value = "";
+    handleRom(file);
+  });
+  el.retryLaunch.addEventListener("click", startBattle);
   for (const [i, r] of RENDERS.entries()) {
     el.res.add(new Option(r.label, String(r.r), i === 2, i === 2));
   }
@@ -390,19 +650,22 @@ async function boot() {
   } catch (err) {
     state.failed = String(err.message || err);
     el.note.className = "note warn";
-    el.note.innerHTML = `<strong>WebGL 初始化失败</strong>：${escapeHtml(state.failed)}`;
+    el.note.innerHTML = `<strong>${escapeHtml(t("webgl.initFailed"))}</strong>: ${escapeHtml(state.failed)}`;
     return;
   }
   if (!glc) {
     state.failed = "no-webgl2";
     el.note.className = "note warn";
-    el.note.innerHTML = "<strong>浏览器不支持 WebGL2</strong>，无法应用荧光线滤镜。";
+    el.note.textContent = `${t("webgl.missing")}${t("webgl.missingHint")}`;
     return;
   }
   Object.assign(state, glc);
 
   applyResolution();
   startLoop();
+  // Fetch the emulator, this stage's save and the policy now, so choosing a ROM
+  // afterwards only costs load_game + unserialize.
+  warmUp();
 
   el.res.addEventListener("change", () => {
     state.renderScale = Number(el.res.value);
@@ -418,9 +681,10 @@ async function boot() {
   el.closeSettings.addEventListener("click", closeDrawer);
   el.backdrop.addEventListener("click", closeDrawer);
   el.drawer.addEventListener("click", (e) => e.stopPropagation());
-  el.romFile.addEventListener("change", () => handleRom(el.romFile.files?.[0]));
   el.restart.addEventListener("click", startBattle);
-  el.sound.addEventListener("click", () => state.session?.resumeAudio());
+  el.sound.addEventListener("click", () => {
+    if (state.session) startAudio(state.session);
+  });
   const fullscreen = () => {
     const result = document.fullscreenElement ? document.exitFullscreen() : el.stage.requestFullscreen?.();
     result?.catch(() => {});
@@ -430,6 +694,7 @@ async function boot() {
 
   // Picking another stage restarts the fight right away.
   el.stageSelect.addEventListener("change", () => {
+    prepareFixture(fixtureUrlFor(el.stageSelect.value)).catch(() => {});
     if (!state.romBytes) return;
     startBattle();
   });

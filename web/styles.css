@@ -32,6 +32,7 @@ a { color: var(--blue); }
 .bar h1 { margin: 0; font-size: clamp(1.1rem, 3vw, 1.65rem); line-height: 1.15; letter-spacing: -.02em; }
 .bar h1 span { display: block; margin-top: .3rem; color: var(--blue); font-size: .875rem; letter-spacing: 0; }
 .bar-actions { display: flex; gap: .5rem; }
+#langToggle { min-width: 3.6rem; justify-content: center; }
 
 .btn, select, input::file-selector-button {
   border: 1px solid var(--border);
@@ -95,8 +96,60 @@ select {
 .file-label + .file { max-width: 100%; color: var(--muted); font-size: .875rem; }
 .file::file-selector-button { margin-right: .65rem; }
 .gate .file::file-selector-button { background: var(--blue); border-color: var(--blue); color: #0c1729; }
-.rom-status, .note.warn { color: var(--danger); overflow-wrap: anywhere; }
-.rom-status code { overflow-wrap: anywhere; }
+.note.warn { color: var(--danger); overflow-wrap: anywhere; }
+.rom-status {
+  display: grid;
+  gap: .1rem;
+  padding: .45rem 1rem .5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  background: #10172a;
+  font-size: .875rem;
+}
+.rom-line { display: flex; gap: .6rem; align-items: baseline; min-width: 0; margin: 0; }
+.rom-status strong { white-space: nowrap; color: var(--text); }
+.rom-status .rom-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rom-status[data-status="ok"] strong, .launch dd[data-status="ok"] { color: var(--blue); }
+.rom-status[data-status="error"] strong, .launch dd[data-status="error"] { color: var(--danger); }
+.rom-status[data-status="ok"] strong::before { content: "✓ "; }
+.rom-status[data-status="error"] strong::before { content: "✗ "; }
+.rom-detail { margin: 0; color: var(--muted); font-size: .8125rem; overflow-wrap: anywhere; }
+.rom-status[data-status="error"] .rom-detail { color: var(--danger); }
+.hint { color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
+.launch { width: min(100%, 26rem); }
+.launch-label { margin: .1rem 0 .25rem; color: var(--text); font-size: .8125rem; font-weight: 600; }
+.launch-total { display: flex; align-items: center; gap: .6rem; margin: 0 0 .2rem; }
+.launch-total progress {
+  flex: 1;
+  height: .55rem;
+  border: 0;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #0a1220;
+  appearance: none;
+}
+.launch-total progress::-webkit-progress-bar { background: #0a1220; }
+.launch-total progress::-webkit-progress-value {
+  border-radius: 99px;
+  background: linear-gradient(90deg, #5c96e8, var(--blue));
+  transition: width .25s ease-out;
+}
+.launch-total progress::-moz-progress-bar { border-radius: 99px; background: var(--blue); }
+.launch-total b { min-width: 3.2em; text-align: right; color: var(--blue); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.launch .hint { margin: .15rem 0 0; }
+.launch dl { margin: .25rem 0 0; border-top: 1px solid var(--border); }
+.launch dl div {
+  display: grid;
+  grid-template-columns: 5.4rem minmax(0, 1fr);
+  gap: .4rem;
+  padding: .35rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .875rem;
+}
+.launch dt { color: var(--text); }
+.launch dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.launch button { margin-top: .65rem; }
+.gate:has(#romFile:disabled) .rom-picker { opacity: .55; cursor: wait; }
 
 .battle-status { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem 1.5rem; }
 .battle-status div { min-width: 7rem; }

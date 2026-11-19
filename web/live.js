@@ -7,9 +7,11 @@
 // A session is: boot core -> load ROM from bytes -> unserialize a fixture ->
 // then once per 4 emulator frames: observe, decide, act.
 
-import { Policy } from "./policy.js?v=19";
+import { Policy } from "./policy.js?v=24";
 import { Observer, decodeFrame } from "./observer.js?v=9";
-import { expandAction } from "./actions.js?v=10";
+import { expandAction } from "./actions.js?v=24";
+import { download, withDeadline } from "./assets.js?v=24";
+import { t } from "./i18n.js?v=24";
 
 const RETRO_MEMORY_SYSTEM_RAM = 2;
 
@@ -59,6 +61,85 @@ export class InputFifo {
 
 // Bump this whenever a ladder fixture is regenerated.
 export const FIXTURE_VERSION = 4;
+const compiledCores = new Map();
+const policies = new Map();
+const preparations = new Map();
+
+/**
+ * Run one download/parse once and share it between the page-load warm-up and
+ * the real start, so picking a ROM never repeats work already in flight.
+ * Progress listeners are broadcast to, and a failure clears the slot so the
+ * next attempt really retries instead of awaiting a rejected promise.
+ */
+function prepare(key, start, onProgress) {
+  let slot = preparations.get(key);
+  if (!slot) {
+    const listeners = new Set();
+    const promise = start((bytes, total) => {
+      for (const listener of listeners) listener(bytes, total);
+    }).catch((error) => {
+      preparations.delete(key);
+      throw error;
+    });
+    slot = { promise, listeners };
+    preparations.set(key, slot);
+  }
+  if (onProgress) {
+    slot.listeners.add(onProgress);
+    slot.promise.finally(() => slot.listeners.delete(onProgress)).catch(() => {});
+  }
+  return slot.promise;
+}
+
+/** Fetch, compile and initialise nothing yet: just have the core ready to boot. */
+export function prepareCore(corePath = "cores/", { onProgress } = {}) {
+  const wasmUrl = `${corePath}genesis_plus_gx.wasm`;
+  return prepare(`core:${wasmUrl}`, report => (async () => {
+    const [module] = await Promise.all([
+      compiledCores.get(wasmUrl) ?? download(wasmUrl, { onProgress: report })
+        .then(bytes => withDeadline(WebAssembly.compile(bytes), 15_000, t("core.compileTimeout"))),
+      loadCoreScript(`${corePath}genesis_plus_gx.js`),
+    ]);
+    compiledCores.set(wasmUrl, module);
+  })(), onProgress);
+}
+
+/** Load the policy weights once; later sessions reuse the parsed network. */
+export function preparePolicy(modelPath = "models/", { onProgress } = {}) {
+  return prepare(`policy:${modelPath}`, report => (async () => {
+    const policy = policies.get(modelPath) ?? await Policy.load(modelPath, { onProgress: report });
+    policies.set(modelPath, policy);
+    return policy;
+  })(), onProgress);
+}
+
+/** Download one stage save in the background; loadFixture reuses the bytes. */
+export function prepareFixture(url, { onProgress } = {}) {
+  return prepare(`fixture:${url}`, report => download(url, { onProgress: report }), onProgress);
+}
+
+async function loadCoreScript(url, signal) {
+  if (window.createGenesisPlusGX) return;
+  if (signal?.aborted) throw signal.reason;
+  const script = document.createElement("script");
+  let cancel;
+  const ready = new Promise((resolve, reject) => {
+    cancel = () => reject(signal.reason);
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(t("core.scriptFailed")));
+    signal?.addEventListener("abort", cancel, { once: true });
+    script.src = url;
+    document.head.appendChild(script);
+  });
+  try {
+    await withDeadline(ready, 25_000, t("core.scriptTimeout"));
+    if (typeof window.createGenesisPlusGX !== "function") throw new Error(t("core.scriptInvalid"));
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    script.onload = script.onerror = null;
+    script.remove();
+  }
+}
 
 export class LiveSession {
   constructor(opts = {}) {
@@ -68,6 +149,8 @@ export class LiveSession {
     this.onFrame = opts.onFrame ?? null;
 
     this.M = null;
+    this.disposed = false;
+    this.pendingAudio = null;
     this.cb = null;
     this.frameCopy = null;
     this.ramPtr = 0;
@@ -83,17 +166,20 @@ export class LiveSession {
     this.stats = { decisions: 0, frames: 0, p1KO: 0, p2KO: 0 };
   }
 
-  async loadCore() {
-    if (!window.createGenesisPlusGX) {
-      await new Promise((res, rej) => {
-        const s = document.createElement("script");
-        s.src = `${this.corePath}genesis_plus_gx.js`;
-        s.onload = res;
-        s.onerror = () => rej(new Error("core script failed to load"));
-        document.head.appendChild(s);
-      });
-    }
-    const M = await window.createGenesisPlusGX({ print: () => {}, printErr: () => {} });
+  async loadCore({ signal, onProgress } = {}) {
+    await prepareCore(this.corePath, { onProgress });
+    if (signal?.aborted) throw signal.reason;
+    const module = compiledCores.get(`${this.corePath}genesis_plus_gx.wasm`);
+    const M = await withDeadline(window.createGenesisPlusGX({
+      print: () => {},
+      printErr: () => {},
+      instantiateWasm(imports, receive) {
+        const instance = new WebAssembly.Instance(module, imports);
+        receive(instance, module);
+        return instance.exports;
+      },
+    }), 15_000, t("core.initTimeout"));
+    if (signal?.aborted) throw signal.reason;
     this.M = M;
 
     const envCb = M.addFunction((cmd, data) => {
@@ -143,43 +229,46 @@ export class LiveSession {
     M.stringToUTF8("/tmp/game.md", pp, 64);
     const gi = M._malloc(16);
     M.HEAP32[(gi >> 2) + 0] = pp;
-    if (M._retro_load_game(gi) !== 1) throw new Error("retro_load_game failed (unsupported or corrupt ROM)");
+    if (M._retro_load_game(gi) !== 1) throw new Error(t("core.romFailed"));
     M._retro_reset();
     this.ramPtr = M._retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
     return this.ramPtr;
   }
 
-  async loadFixture(url = this.fixtureUrl) {
+  async loadFixture(url = this.fixtureUrl, { signal, onProgress } = {}) {
     const M = this.M;
-    const source = await fetch(url);
-    if (!source.ok) throw new Error(`关卡存档载入失败（HTTP ${source.status}）`);
-    let st = new Uint8Array(await source.arrayBuffer());
+    let st = await prepareFixture(url, { onProgress });
+    if (signal?.aborted) throw signal.reason;
 
     // Ladder fixtures ship gzipped (1 MB of state compresses to ~40 KB).
     if (st[0] === 0x1f && st[1] === 0x8b) {
       if (typeof DecompressionStream !== "function") {
-        throw new Error("当前浏览器不支持 gzip 解压，无法载入压缩存档");
+        throw new Error(t("fixture.gzipUnsupported"));
       }
       const stream = new Blob([st]).stream().pipeThrough(new DecompressionStream("gzip"));
-      st = new Uint8Array(await new Response(stream).arrayBuffer());
+      const data = await withDeadline(new Response(stream).arrayBuffer(), 10_000, t("fixture.gzipTimeout"));
+      st = new Uint8Array(data);
     }
 
+    if (signal?.aborted) throw signal.reason;
     if (st.length !== M._retro_serialize_size()
         || new TextDecoder().decode(st.subarray(0, 16)) !== "GENPLUS-GX 1.7.6") {
-      throw new Error("关卡存档的 Genesis Plus GX 格式无效");
+      throw new Error(t("fixture.invalid"));
     }
     const sp = M._malloc(st.length);
     M.HEAPU8.set(st, sp);
     const ok = M._retro_unserialize(sp, st.length) === 1;
-    if (!ok) throw new Error(`存档 ${url} 无法载入（格式或版本不匹配）`);
+    if (!ok) throw new Error(t("fixture.loadFailed", { url }));
     M._retro_run();
     // Deliberately not freed: the core's fast-savestate path can keep reading the
     // buffer, and one 1 MB allocation per session is not worth the risk.
     return ok;
   }
 
-  async loadPolicy() {
-    this.policy = await Policy.load(this.modelPath);
+  async loadPolicy({ signal, onProgress } = {}) {
+    const policy = await preparePolicy(this.modelPath, { onProgress });
+    if (signal?.aborted) throw signal.reason;
+    this.policy = policy;
     return this.policy;
   }
 
@@ -194,22 +283,30 @@ export class LiveSession {
 
   async initAudio() {
     const Audio = window.AudioContext;
-    if (!Audio) return;
+    if (!Audio || this.disposed || this.audio || this.pendingAudio) return;
     const av = this.M._malloc(40);
     this.M._retro_get_system_av_info(av);
     const sampleRate = new DataView(this.M.HEAPU8.buffer).getFloat64(av + 32, true);
     this.M._free(av);
     const ctx = new Audio({ sampleRate, latencyHint: "interactive" });
+    this.pendingAudio = ctx;
+    // Start resuming while a click still has user activation. Some browsers
+    // defer the promise until another gesture, so startup never waits for it.
+    ctx.resume().catch(() => {});
     try {
-      await ctx.audioWorklet.addModule(new URL("./audio-worklet.js?v=15", import.meta.url));
+      await withDeadline(
+        ctx.audioWorklet.addModule(new URL("./audio-worklet.js?v=15", import.meta.url)),
+        5_000, t("audio.moduleTimeout"),
+      );
+      if (this.disposed) return;
       const node = new AudioWorkletNode(ctx, "genesis-audio", { outputChannelCount: [2] });
       this.audioStats = { framesIn: 0, framesOut: 0, underruns: 0 };
       node.port.onmessage = ({ data }) => Object.assign(this.audioStats, data);
       node.connect(ctx.destination);
       this.audio = { ctx, node };
-    } catch (error) {
-      await ctx.close();
-      throw error;
+    } finally {
+      this.pendingAudio = null;
+      if (!this.audio && ctx.state !== "closed") ctx.close().catch(() => {});
     }
   }
 
@@ -293,9 +390,11 @@ export class LiveSession {
    * core instance and a second audio context running.
    */
   dispose() {
+    this.disposed = true;
+    if (this.pendingAudio?.state !== "closed") this.pendingAudio?.close().catch(() => {});
     if (this.audio) {
       try { this.audio.node.disconnect(); } catch { /* already gone */ }
-      try { this.audio.ctx.close(); } catch { /* already closed */ }
+      this.audio.ctx.close().catch(() => {});
       this.audio = null;
     }
 

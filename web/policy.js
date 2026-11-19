@@ -4,6 +4,9 @@
 // fast: about 10 M multiply-adds per decision, and the policy only decides once
 // every 4 frames (15 Hz).  That removes any need for ONNX Runtime or a CDN.
 //
+import { download } from "./assets.js?v=24";
+import { t } from "./i18n.js?v=24";
+
 // Architecture (mirrors chunppo/policy.py + SB3 NatureCNN):
 //   image 84x84x3 --conv8/4--> 32@20 --conv4/2--> 64@9 --conv3/1--> 64@7
 //                 --linear--> 1024 --ReLU--
@@ -83,20 +86,24 @@ export class Policy {
     this.dense = acceleration ? wasmDense(blob, acceleration) : denseJs;
   }
 
-  static async load(basePath = "models/") {
-    const [metaRes, binRes, acceleration] = await Promise.all([
-      fetch(`${basePath}chunppo_p27.json`),
-      fetch(`${basePath}chunppo_p27.bin`),
-      fetch(`${basePath}policy_simd.wasm?v=15`)
-        .then(async response => WebAssembly.instantiate(await response.arrayBuffer()))
-        .then(({ instance }) => instance.exports)
-        .catch(() => null),
+  static async load(basePath = "models/", { signal, onProgress } = {}) {
+    const acceleration = download(`${basePath}policy_simd.wasm?v=15`, { signal, idleMs: 5_000 })
+      .then(async bytes => (await WebAssembly.instantiate(bytes)).instance.exports)
+      .catch(() => null);
+    const [index, weights] = await Promise.all([
+      download(`${basePath}chunppo_p27.json`, { signal }),
+      download(`${basePath}chunppo_p27.bin`, { signal, onProgress }),
     ]);
-    if (!metaRes.ok) throw new Error(`policy meta ${metaRes.status}`);
-    if (!binRes.ok) throw new Error(`policy weights ${binRes.status}`);
-    const meta = await metaRes.json();
-    const blob = new Float32Array(await binRes.arrayBuffer());
-    return new Policy(blob, meta, acceleration);
+    const meta = JSON.parse(new TextDecoder().decode(index));
+    if (weights.byteLength !== meta.params * Float32Array.BYTES_PER_ELEMENT) {
+      throw new Error(t("policy.incomplete"));
+    }
+    const blob = new Float32Array(weights.buffer);
+    const policy = new Policy(blob, meta);
+    acceleration.then(wasm => {
+      if (wasm && !signal?.aborted) policy.dense = wasmDense(blob, wasm);
+    }).catch(() => {});
+    return policy;
   }
 
   get(name) {
