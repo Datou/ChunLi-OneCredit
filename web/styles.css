@@ -143,12 +143,18 @@ select {
 .launch button { margin-top: .65rem; }
 .gate:has(#romFile:disabled) .rom-picker { opacity: .55; cursor: wait; }
 
-.battle-status { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem 1.5rem; }
-.battle-status div { min-width: 7rem; }
-.battle-status span { display: block; color: var(--muted); font-size: .875rem; }
-.battle-status strong { min-height: 1.5rem; display: block; }
+.battle-status { display: flex; align-items: center; flex-wrap: nowrap; gap: .65rem 1.25rem; min-width: 0; }
+.battle-status div { min-width: 0; }
+.battle-status .stat-label { display: block; color: var(--muted); font-size: .875rem; }
+.battle-status strong {
+  display: block;
+  min-height: 1.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #actionLabel { color: var(--gold); }
-#holdInput { margin-left: auto; touch-action: none; }
+#holdInput { margin-left: auto; flex: 0 0 auto; touch-action: none; }
 #holdInput[aria-pressed="true"] { color: #131b2a; background: var(--gold); border-color: var(--gold); }
 .note { margin: .55rem 0 0; color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums; }
 .note:empty { display: none; }
@@ -188,8 +194,8 @@ kbd { padding: .05rem .3rem; border: 1px solid var(--border); border-radius: .2r
 @media (max-width: 29rem) {
   .cabinet-head, .cabinet-foot { padding-inline: .65rem; }
   .cabinet-head select { flex: 1 1 9rem; }
-  .battle-status { gap: .5rem 1rem; }
-  #holdInput { margin-left: 0; }
+  .battle-status { gap: .5rem .8rem; }
+  .delay-queue { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -333,7 +339,7 @@ body {
 }
 .battle-status { gap: .5rem .8rem; }
 .battle-status div {
-  min-width: 6rem;
+  min-width: 0;
   padding-inline: .65rem;
   border-inline-start: 2px solid #45607d;
 }
@@ -341,7 +347,14 @@ body {
 .battle-status strong { font-size: clamp(1rem, 2vw, 1.2rem); }
 #actionLabel { color: #ffdc88; }
 #activeDelay { color: var(--blue); font-variant-numeric: tabular-nums; }
-#holdInput { background: #222c47; min-height: 2.7rem; user-select: none; -webkit-touch-callout: none; }
+#holdInput {
+  background: #222c47;
+  min-height: 2.7rem;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#holdInput span { user-select: none; -webkit-user-select: none; }
 #holdInput[aria-pressed="true"] { background: var(--blue); color: #0d2130; border-color: var(--blue); }
 .drawer { background: #11192d; }
 .drawer-head { background: #19223b; }
@@ -352,8 +365,8 @@ body {
   .bar h1 { font-size: clamp(1rem, 5vw, 1.4rem); }
   .gate h2 { max-width: 14ch; }
   .gate { min-height: 20rem; }
-  .battle-status div { min-width: 5.4rem; padding-inline: .45rem; }
-  #holdInput { margin-left: 0; min-height: 2.55rem; }
+  .battle-status div { min-width: 0; padding-inline: .45rem; }
+  #holdInput { margin-left: auto; min-height: 2.55rem; }
 }
 #holdInput .hold-active,
 #holdInput[aria-pressed="true"] .hold-ready { display: none; }

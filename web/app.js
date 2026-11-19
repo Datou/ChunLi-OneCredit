@@ -5,10 +5,10 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=15";
-import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=26";
-import { actionLabels } from "./actions.js?v=26";
-import { withDeadline } from "./assets.js?v=26";
-import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=26";
+import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=27";
+import { actionLabels } from "./actions.js?v=27";
+import { withDeadline } from "./assets.js?v=27";
+import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=27";
 
 const NATIVE = { w: 256, h: 200 }; // game pixels after the standard crop
 const FRAME_MS = 1000 / 59.92274340431231;
@@ -59,6 +59,8 @@ const el = {
   battleStatus: $("battleStatus"),
   actionLabel: $("actionLabel"),
   activeDelay: $("activeDelay"),
+  delayBase: $("delayBase"),
+  delayQueue: $("delayQueue"),
   holdInput: $("holdInput"),
   restart: $("restart"),
   fullscreen: $("fullscreen"),
@@ -286,9 +288,8 @@ function updateLiveStatus(last) {
   else if (state.lastAction !== undefined) el.actionLabel.textContent = actionLabels(getLang())[state.lastAction];
   const delay = state.session.baseDelay;
   const queued = state.session.fifo.lastDelay;
-  el.activeDelay.textContent = queued > delay
-    ? t("delay.queued", { n: delay, q: queued })
-    : t("delay.base", { n: delay });
+  el.delayBase.textContent = t("delay.base", { n: delay });
+  el.delayQueue.textContent = queued > delay ? t("delay.queueSuffix", { q: queued }) : "";
   el.note.className = "note";
   const detail = parts.join(" · ");
   if (el.note.textContent !== detail) el.note.textContent = detail;
@@ -620,7 +621,7 @@ function renderDynamic() {
   renderTasks();
   renderLaunchError();
   if (state.session) updateLiveStatus();
-  else el.activeDelay.textContent = t("delay.base", { n: 0 });
+  else el.delayBase.textContent = t("delay.base", { n: 0 });
 }
 
 function renderLaunchLabels() {
@@ -631,7 +632,8 @@ function renderLaunchLabels() {
 async function boot() {
   applyI18n();
   currentLanguageButton();
-  el.activeDelay.textContent = t("delay.base", { n: 0 });
+  el.delayBase.textContent = t("delay.base", { n: 0 });
+  el.delayQueue.textContent = "";
   onLangChange(() => {
     currentLanguageButton();
     renderDynamic();

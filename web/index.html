@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chun-Li One Credit · 春丽一命通关</title>
-<link rel="stylesheet" href="styles.css?v=26">
+<link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
 <header class="bar">
@@ -71,8 +71,8 @@
     </div>
     <div class="cabinet-foot">
       <div class="battle-status" id="battleStatus" hidden>
-        <div><span data-i18n="battle.action">策略动作</span><strong id="actionLabel">—</strong></div>
-        <div><span data-i18n="battle.delay">输入延迟</span><strong id="activeDelay">0 帧</strong></div>
+        <div><span class="stat-label" data-i18n="battle.action">策略动作</span><strong id="actionLabel">—</strong></div>
+        <div><span class="stat-label" data-i18n="battle.delay">输入延迟</span><strong id="activeDelay"><span id="delayBase"></span><span id="delayQueue" class="delay-queue"></span></strong></div>
         <button id="holdInput" class="btn" type="button" aria-pressed="false" aria-label="按住切断输入，松开恢复" data-i18n-aria="hold.aria">
           <span class="hold-ready" data-i18n="hold.ready">按住切断输入</span>
           <span class="hold-active" data-i18n="hold.active">松开恢复</span>
@@ -137,6 +137,6 @@
   </div>
 </aside>
 
-<script src="app.js?v=26" type="module"></script>
+<script src="app.js?v=27" type="module"></script>
 </body>
 </html>
