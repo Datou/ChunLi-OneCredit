@@ -8,7 +8,7 @@
 // then once per 4 emulator frames: observe, decide, act.
 
 import { Policy } from "./policy.js?v=29";
-import { Observer, decodeFrame } from "./observer.js?v=11";
+import { Observer, decodeFrame } from "./observer.js?v=12";
 import { expandAction } from "./actions.js?v=29";
 import { download, withDeadline } from "./assets.js?v=29";
 import { t } from "./i18n.js?v=29";

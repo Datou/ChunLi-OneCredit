@@ -16,6 +16,11 @@ export const IMG = 84;
 export const HIST_LEN = 24;
 export const N_ACTIONS = 27;
 
+// cv2 resize: coefficients are 11-bit fixed point, two passes give 22 bits.
+const RESIZE_BITS = 11;
+const RESIZE_SCALE = 1 << RESIZE_BITS;
+const RESIZE_ROUND = 1 << (2 * RESIZE_BITS - 1);
+
 const GAUSS5 = (() => {
   // cv2.GaussianBlur(ksize=5, sigma=0) resolves to getGaussianKernel's
   // small-gaussian table, i.e. the binomial [1,4,6,4,1]/16 per axis -- not a
@@ -245,33 +250,54 @@ export class Observer {
   }
 }
 
-/** Bilinear resize of an RGB888 crop to 84x84 (matches cv2.INTER_LINEAR). */
+/** Bilinear resize of an RGB888 crop to 84x84 with cv2's 11-bit coefficients. */
+function resizeCoeffs(nIn) {
+  const scale = nIn / IMG;
+  const out = new Int32Array(IMG * 3);
+  for (let i = 0; i < IMG; i++) {
+    // cv2 computes the source coordinate in float32.
+    const f = Math.fround((i + 0.5) * scale - 0.5);
+    let i0 = Math.floor(f);
+    let frac = f - i0;
+    if (i0 < 0) { i0 = 0; frac = 0; }
+    if (i0 >= nIn - 1) { i0 = nIn - 1; frac = 0; }
+    out[i * 3] = i0;
+    out[i * 3 + 1] = ((1 - frac) * RESIZE_SCALE) | 0;
+    out[i * 3 + 2] = (frac * RESIZE_SCALE) | 0;
+  }
+  return out;
+}
+
 function resize84(src, sw, sh) {
+  const xs = resizeCoeffs(sw);
+  const ys = resizeCoeffs(sh);
   const out = new Uint8Array(IMG * IMG * 3);
-  const sx = sw / IMG;
-  const sy = sh / IMG;
-  for (let y = 0; y < IMG; y++) {
-    const fy = (y + 0.5) * sy - 0.5;
-    let y0 = Math.floor(fy);
-    const wy = fy - y0;
-    if (y0 < 0) { y0 = 0; }
-    const y1 = Math.min(sh - 1, y0 + 1);
+  const h0 = new Int32Array(IMG * 3);
+  const h1 = new Int32Array(IMG * 3);
+  const filterRow = (row, dst) => {
+    const base = row * sw * 3;
     for (let x = 0; x < IMG; x++) {
-      const fx = (x + 0.5) * sx - 0.5;
-      let x0 = Math.floor(fx);
-      const wx = fx - x0;
-      if (x0 < 0) { x0 = 0; }
-      const x1 = Math.min(sw - 1, x0 + 1);
-      const i00 = (y0 * sw + x0) * 3;
-      const i01 = (y0 * sw + x1) * 3;
-      const i10 = (y1 * sw + x0) * 3;
-      const i11 = (y1 * sw + x1) * 3;
-      const o = (y * IMG + x) * 3;
-      for (let c = 0; c < 3; c++) {
-        const top = src[i00 + c] * (1 - wx) + src[i01 + c] * wx;
-        const bot = src[i10 + c] * (1 - wx) + src[i11 + c] * wx;
-        out[o + c] = Math.round(top * (1 - wy) + bot * wy);
-      }
+      const i0 = xs[x * 3];
+      const c0 = xs[x * 3 + 1];
+      const c1 = xs[x * 3 + 2];
+      const i1 = Math.min(sw - 1, i0 + 1);
+      const a = base + i0 * 3;
+      const b = base + i1 * 3;
+      const o = x * 3;
+      for (let c = 0; c < 3; c++) dst[o + c] = src[a + c] * c0 + src[b + c] * c1;
+    }
+  };
+  for (let y = 0; y < IMG; y++) {
+    const y0 = ys[y * 3];
+    const cy0 = ys[y * 3 + 1];
+    const cy1 = ys[y * 3 + 2];
+    const y1 = Math.min(sh - 1, y0 + 1);
+    filterRow(y0, h0);
+    filterRow(y1, h1);
+    const o = y * IMG * 3;
+    for (let i = 0; i < IMG * 3; i++) {
+      const v = (h0[i] * cy0 + h1[i] * cy1 + RESIZE_ROUND) >> (2 * RESIZE_BITS);
+      out[o + i] = v < 0 ? 0 : v > 255 ? 255 : v;
     }
   }
   return out;
