@@ -12,3 +12,4 @@ __pycache__/
 *.mp4
 **/rom.md
 /roms/
+!/web/cores/fixtures/ladder/stage??.state.gz

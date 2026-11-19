@@ -5,7 +5,7 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=15";
-import { FIXTURE_VERSION, LiveSession } from "./live.js?v=18";
+import { FIXTURE_VERSION, LiveSession } from "./live.js?v=19";
 import { ACTION_LABELS } from "./actions.js?v=10";
 
 const NATIVE = { w: 256, h: 200 }; // game pixels after the standard crop
@@ -43,12 +43,10 @@ const el = {
   drawer: $("drawer"),
   romFile: $("romFile"),
   romStatus: $("romStatus"),
-  fixtureFiles: $("fixtureFiles"),
-  fixtureStatus: $("fixtureStatus"),
   battleStatus: $("battleStatus"),
   actionLabel: $("actionLabel"),
   activeDelay: $("activeDelay"),
-  holdDelay: $("holdDelay"),
+  holdInput: $("holdInput"),
   restart: $("restart"),
   fullscreen: $("fullscreen"),
   sound: $("sound"),
@@ -70,12 +68,11 @@ const state = {
   failed: null,
   rom: null,
   romBytes: null,
-  fixtures: new Map(),
   session: null,
   busy: false,
   nextFrame: null,
   needsDraw: true,
-  spaceHeld: false,
+  keyHeld: false,
   pointerHeld: false,
 };
 
@@ -212,9 +209,9 @@ function updateLiveStatus(last) {
     `KO ${s.p2KO} : ${s.p1KO}`,
     `${s.frames.toLocaleString()} 帧`,
   ];
-  if (state.session.frozen) parts.push("输入暂停");
-  if (last) el.actionLabel.textContent = ACTION_LABELS[last.action];
-  const delay = state.session.effectiveDelay;
+  if (state.session.inputPaused) el.actionLabel.textContent = "输入已切断";
+  else if (last) el.actionLabel.textContent = ACTION_LABELS[last.action];
+  const delay = state.session.baseDelay;
   const queued = state.session.fifo.lastDelay;
   el.activeDelay.textContent = queued > delay ? `${delay} 帧 · 最近排队 ${queued} 帧` : `${delay} 帧`;
   el.note.className = "note";
@@ -229,21 +226,25 @@ function syncBattleControls() {
   el.sound.hidden = !audio || audio.state === "running";
   el.restart.disabled = state.busy || !state.romBytes;
   el.stageSelect.disabled = state.busy;
-  el.fixtureFiles.disabled = state.busy;
 }
 
-function syncDelayHold() {
-  const held = state.spaceHeld || state.pointerHeld;
-  el.holdDelay.setAttribute("aria-pressed", String(held));
-  state.session?.setSpaceHeld(held);
+function syncInputHold() {
+  const held = state.keyHeld || state.pointerHeld;
+  el.holdInput.setAttribute("aria-pressed", String(held));
+  const session = state.session;
+  if (session?.inputPaused && !held) el.actionLabel.textContent = "—";
+  session?.setInputPaused(held);
   updateLiveStatus();
+}
+
+function clearInputHold() {
+  state.keyHeld = state.pointerHeld = false;
+  syncInputHold();
 }
 
 // ----------------------------------------------------------------- drawer
 function openDrawer() {
-  state.spaceHeld = false;
-  state.session?.setFrozen(false);
-  syncDelayHold();
+  clearInputHold();
   el.drawer.classList.add("open");
   el.drawer.setAttribute("aria-hidden", "false");
   el.backdrop.hidden = false;
@@ -331,6 +332,7 @@ async function startBattle() {
   state.busy = true;
   state.session?.dispose?.();
   state.session = null;
+  clearInputHold();
   syncBattleControls();
 
   el.romStatus.hidden = true;
@@ -347,7 +349,7 @@ async function startBattle() {
     sess = new LiveSession({ fixtureUrl });
     await sess.loadCore();
     await sess.loadRom(state.romBytes);
-    const fixtureOk = await sess.loadFixture(fixtureUrl, state.fixtures.get(stage));
+    const fixtureOk = await sess.loadFixture();
     await sess.loadPolicy();
     await sess.initObserver();
     await sess.initAudio().catch(error => console.warn("音频初始化失败", error));
@@ -362,17 +364,13 @@ async function startBattle() {
     sess.setJitter(Number(el.jitterP.value));
     el.gate.classList.add("hidden");
     el.actionLabel.textContent = "—";
-    syncDelayHold();
+    syncInputHold();
     if (!el.drawer.classList.contains("open")) el.stage.focus({ preventScroll: true });
   } catch (err) {
     sess?.dispose();
     el.gate.classList.remove("hidden");
     el.note.textContent = "";
-    if (err.status === 404) {
-      romError(`此关需要本地存档。请在<strong>设置 → 本地关卡存档</strong>中选择 <code>${el.stageSelect.value}.state.gz</code>。 <a href="https://github.com/Datou/ChunLi-OneCredit/blob/main/docs/savestates.md">存档生成方法</a>`);
-    } else {
-      romError(`<b>启动失败</b>：${escapeHtml(String(err.message || err))}`);
-    }
+    romError(`<b>启动失败</b>：${escapeHtml(String(err.message || err))}`);
   } finally {
     state.busy = false;
     syncBattleControls();
@@ -421,16 +419,6 @@ async function boot() {
   el.backdrop.addEventListener("click", closeDrawer);
   el.drawer.addEventListener("click", (e) => e.stopPropagation());
   el.romFile.addEventListener("change", () => handleRom(el.romFile.files?.[0]));
-  el.fixtureFiles.addEventListener("change", () => {
-    for (const file of el.fixtureFiles.files) {
-      const match = /^(stage(?:0[1-9]|1[0-2]))\.state(?:\.gz)?$/i.exec(file.name);
-      if (match) state.fixtures.set(match[1].toLowerCase(), file);
-    }
-    const stages = [...state.fixtures.keys()].sort().map(name => name.slice(-2));
-    el.fixtureStatus.textContent = stages.length ? `已选择关卡 ${stages.join("、")}` : "请选择命名为 stageNN.state.gz 的网页存档";
-    el.fixtureFiles.value = "";
-    if (state.fixtures.has(el.stageSelect.value)) startBattle();
-  });
   el.restart.addEventListener("click", startBattle);
   el.sound.addEventListener("click", () => state.session?.resumeAudio());
   const fullscreen = () => {
@@ -461,53 +449,41 @@ async function boot() {
   el.delayFrames.addEventListener("input", applyDelay);
   el.jitterP.addEventListener("input", applyJitter);
 
-  el.holdDelay.addEventListener("pointerdown", e => {
-    if (e.button !== 0) return;
+  el.holdInput.addEventListener("pointerdown", e => {
+    if (!e.isPrimary || e.button !== 0) return;
     e.preventDefault();
-    el.holdDelay.setPointerCapture(e.pointerId);
+    el.holdInput.setPointerCapture(e.pointerId);
     state.pointerHeld = true;
-    syncDelayHold();
+    syncInputHold();
   });
-  el.holdDelay.addEventListener("contextmenu", e => e.preventDefault());
-  el.holdDelay.addEventListener("lostpointercapture", () => {
+  el.holdInput.addEventListener("contextmenu", e => e.preventDefault());
+  el.holdInput.addEventListener("lostpointercapture", () => {
     state.pointerHeld = false;
-    syncDelayHold();
+    syncInputHold();
   });
-  window.addEventListener("blur", () => {
-    state.spaceHeld = state.pointerHeld = false;
-    state.session?.setFrozen(false);
-    syncDelayHold();
+  el.holdInput.addEventListener("keydown", e => {
+    if (e.code !== "Space" && e.code !== "Enter") return;
+    e.preventDefault();
+    state.keyHeld = true;
+    syncInputHold();
   });
+  el.holdInput.addEventListener("keyup", e => {
+    if (e.code !== "Space" && e.code !== "Enter") return;
+    e.preventDefault();
+    state.keyHeld = false;
+    syncInputHold();
+  });
+  el.holdInput.addEventListener("blur", () => {
+    state.keyHeld = false;
+    syncInputHold();
+  });
+  window.addEventListener("blur", clearInputHold);
   document.addEventListener("keydown", (e) => {
     if (e.code === "Escape" && el.drawer.classList.contains("open")) {
       closeDrawer();
       return;
     }
-    if (!state.session || el.drawer.classList.contains("open")
-        || e.target.closest?.("input, select, textarea, button, a, [contenteditable]") && e.target !== el.holdDelay) return;
-    if (e.code === "Space") {
-      e.preventDefault();
-      if (!e.repeat) {
-        state.spaceHeld = true;
-        syncDelayHold();
-      }
-    } else if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
-      e.preventDefault();
-      state.session.setFrozen(true);
-      updateLiveStatus();
-    } else if (e.code === "KeyF") {
-      fullscreen();
-    }
-  });
-  document.addEventListener("keyup", (e) => {
-    if (e.code === "Space") {
-      if (state.spaceHeld) e.preventDefault();
-      state.spaceHeld = false;
-      syncDelayHold();
-    } else if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
-      state.session?.setFrozen(false);
-      updateLiveStatus();
-    }
+    if (e.code === "KeyF" && state.session && !el.drawer.classList.contains("open")) fullscreen();
   });
 
   el.canvas.addEventListener("dblclick", fullscreen);

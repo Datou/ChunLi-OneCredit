@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chun-Li One Credit · 春丽一命通关</title>
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
 <header class="bar">
@@ -54,7 +54,10 @@
       <div class="battle-status" id="battleStatus" hidden>
         <div><span>策略动作</span><strong id="actionLabel">—</strong></div>
         <div><span>输入延迟</span><strong id="activeDelay">0 帧</strong></div>
-        <button id="holdDelay" class="btn" type="button" aria-pressed="false" title="按住给新输入增加 6 帧延迟"><kbd class="keyboard-hint">空格</kbd> 按住延迟 +6 帧</button>
+        <button id="holdInput" class="btn" type="button" aria-pressed="false" aria-label="按住切断输入，松开恢复">
+          <span class="hold-ready">按住切断输入</span>
+          <span class="hold-active">松开恢复</span>
+        </button>
       </div>
       <p class="note" id="note"></p>
     </div>
@@ -110,21 +113,11 @@
         <span>抖动概率 <b id="vJitter">5%</b></span>
         <input type="range" id="jitterP" min="0" max="0.5" step="0.01" value="0.05">
       </label>
-      <p class="hint">
-        长按画面下方的「按住延迟 +6 帧」可测试输入延迟。
-        <span class="keyboard-hint">也可按住 <kbd>空格</kbd> 增加延迟，或按住 <kbd>Shift</kbd> 暂停提交新输入。</span>
-      </p>
-    </section>
-    <section class="group">
-      <h3>本地关卡存档</h3>
-      <p class="hint">选择网页专用的 stage01.state.gz 等文件。可以一次选多关。</p>
-      <label class="file-label" for="fixtureFiles">选择存档</label>
-      <input type="file" id="fixtureFiles" class="file" accept=".state,.gz" multiple>
-      <output id="fixtureStatus" class="hint"></output>
+      <p class="hint">按住画面下方的按钮可切断春丽的输入，松开后恢复。固定延迟和抖动可单独调整。</p>
     </section>
   </div>
 </aside>
 
-<script src="app.js?v=18" type="module"></script>
+<script src="app.js?v=19" type="module"></script>
 </body>
 </html>

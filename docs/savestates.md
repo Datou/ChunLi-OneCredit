@@ -37,13 +37,13 @@ python -m chunppo.capture_ladder --model chunli-ppo.zip --offset 87 --jitter 0.0
 
 ## 生成网页存档
 
-从项目根目录运行以下命令。需要 Node.js 与 [训练用 ROM](../README.md#运行项目) 放在项目约定路径下。
+网页已经附带 12 份开局。以下流程用于重新生成这些开局，需要 Node.js 和放在约定路径下的 [训练用 ROM](../README.md#运行项目)。
 
 ```bash
 node scripts/web_prepare_ladder.mjs
 python -m http.server 8765 -d web
 ```
 
-脚本用当前 WASM core 从 ROM 录制模板，保留旧档的工作内存、显存和 VDP 寄存器，使用模板补齐新版运行控制状态，然后验证开局。已经可行动的训练存档保留开局帧。生成的 `web/cores/fixtures/ladder/stage01.state.gz` 至 `stage12.state.gz` 供本地网页自动读取；托管网页可以在 **设置 → 本地关卡存档** 一次选入这些文件。
+脚本用当前 WASM core 从 ROM 录制模板，保留旧档的工作内存、显存和 VDP 寄存器，使用模板补齐新版运行控制状态，然后验证开局。已经可行动的训练存档保留开局帧。生成的 `web/cores/fixtures/ladder/stage01.state.gz` 至 `stage12.state.gz` 供网页按关自动加载。
 
 这种转换用于建立可打的网页开局。Python 评测使用 Gym Retro 原生训练存档，报告中的胜率对应这一评测环境。

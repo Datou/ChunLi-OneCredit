@@ -103,8 +103,8 @@ select {
 .battle-status span { display: block; color: var(--muted); font-size: .875rem; }
 .battle-status strong { min-height: 1.5rem; display: block; }
 #actionLabel { color: var(--gold); }
-#holdDelay { margin-left: auto; touch-action: none; }
-#holdDelay[aria-pressed="true"] { color: #131b2a; background: var(--gold); border-color: var(--gold); }
+#holdInput { margin-left: auto; touch-action: none; }
+#holdInput[aria-pressed="true"] { color: #131b2a; background: var(--gold); border-color: var(--gold); }
 .note { margin: .55rem 0 0; color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums; }
 .note:empty { display: none; }
 .cabinet-foot:has(.battle-status[hidden] + .note:empty) { display: none; }
@@ -144,7 +144,7 @@ kbd { padding: .05rem .3rem; border: 1px solid var(--border); border-radius: .2r
   .cabinet-head, .cabinet-foot { padding-inline: .65rem; }
   .cabinet-head select { flex: 1 1 9rem; }
   .battle-status { gap: .5rem 1rem; }
-  #holdDelay { margin-left: 0; }
+  #holdInput { margin-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -296,10 +296,8 @@ body {
 .battle-status strong { font-size: clamp(1rem, 2vw, 1.2rem); }
 #actionLabel { color: #ffdc88; }
 #activeDelay { color: var(--blue); font-variant-numeric: tabular-nums; }
-#holdDelay { background: #222c47; min-height: 2.7rem; user-select: none; -webkit-touch-callout: none; }
-#holdDelay kbd { border-color: #657994; color: var(--blue); }
-#holdDelay[aria-pressed="true"] { background: var(--blue); color: #0d2130; border-color: var(--blue); }
-#holdDelay[aria-pressed="true"] kbd { color: inherit; border-color: #3c6b74; }
+#holdInput { background: #222c47; min-height: 2.7rem; user-select: none; -webkit-touch-callout: none; }
+#holdInput[aria-pressed="true"] { background: var(--blue); color: #0d2130; border-color: var(--blue); }
 .drawer { background: #11192d; }
 .drawer-head { background: #19223b; }
 
@@ -310,9 +308,9 @@ body {
   .gate h2 { max-width: 14ch; }
   .gate { min-height: 20rem; }
   .battle-status div { min-width: 5.4rem; padding-inline: .45rem; }
-  #holdDelay { margin-left: 0; min-height: 2.55rem; }
+  #holdInput { margin-left: 0; min-height: 2.55rem; }
 }
-
-@media (hover: none) and (pointer: coarse) {
-  .keyboard-hint { display: none; }
-}
+#holdInput .hold-active,
+#holdInput[aria-pressed="true"] .hold-ready { display: none; }
+#holdInput[aria-pressed="true"] .hold-active { display: inline; color: inherit; }
+#holdInput .hold-ready { color: inherit; }

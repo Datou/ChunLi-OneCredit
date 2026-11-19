@@ -87,7 +87,8 @@ export class Policy {
     const [metaRes, binRes, acceleration] = await Promise.all([
       fetch(`${basePath}chunppo_p27.json`),
       fetch(`${basePath}chunppo_p27.bin`),
-      WebAssembly.instantiateStreaming(fetch(`${basePath}policy_simd.wasm?v=15`))
+      fetch(`${basePath}policy_simd.wasm?v=15`)
+        .then(async response => WebAssembly.instantiate(await response.arrayBuffer()))
         .then(({ instance }) => instance.exports)
         .catch(() => null),
     ]);

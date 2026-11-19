@@ -10,7 +10,7 @@
 #
 # Upstream Genesis Plus GX (github.com/libretro/Genesis-Plus-GX) builds the full
 # libretro ABI, but its `platform=emscripten` target only produces LLVM bitcode
-# (genesis_plus_gx_libretro_emscripten.bc).  Linking that bitcode ourselves is
+# (an object archive with a .bc suffix). Linking that archive ourselves is
 # exactly where we choose the export list -- and we add retro_get_memory_data.
 #
 # Prerequisites (prepare once):
@@ -39,6 +39,7 @@ function Require-Command([string]$name, [string]$hint) {
 
 Require-Command make "install GNU make (conda install -c conda-forge make)"
 Require-Command emcc "install Emscripten (emsdk install latest; emsdk activate latest)"
+Require-Command emar "activate the Emscripten SDK so emar is also on PATH"
 
 if (-not (Test-Path "$GxRoot\Makefile.libretro")) { throw "Genesis Plus GX not found at $GxRoot" }
 foreach ($dep in 'libretro\libretro-common\include', 'libretro\deps\zlib-1.2.11') {
@@ -67,8 +68,9 @@ $exports = @(
 
 Write-Host "== 1/2 compiling core to LLVM bitcode ==" -ForegroundColor Cyan
 Push-Location $GxRoot
+$archive = $null
 try {
-    & make platform=emscripten -j $Jobs
+    & make -f Makefile.libretro platform=emscripten CC=emcc CXX=em++ AR=emar -j $Jobs
     if ($LASTEXITCODE -ne 0) { throw "make failed with exit code $LASTEXITCODE" }
 
     $bc = Get-ChildItem -Path $GxRoot -Filter '*_libretro_emscripten.bc' -Recurse |
@@ -78,7 +80,20 @@ try {
 
     Write-Host "== 2/2 linking standalone module with exported memory API ==" -ForegroundColor Cyan
     $outJs = Join-Path $OutDir 'genesis_plus_gx.js'
-    & emcc $bc.FullName -O3 --no-entry -o $outJs `
+    # A .bc suffix makes newer emcc try to parse the archive as LLVM IR.
+    $archive = Join-Path ([System.IO.Path]::GetTempPath()) ("genesis-plus-gx-" + [guid]::NewGuid() + ".a")
+    Copy-Item -LiteralPath $bc.FullName -Destination $archive
+    # The static core omits the libretro-common file system implementations.
+    $common = 'libretro/libretro-common'
+    $support = @(
+        'streams/file_stream.c', 'streams/file_stream_transforms.c',
+        'compat/fopen_utf8.c', 'compat/compat_snprintf.c', 'compat/compat_strl.c',
+        'compat/compat_strcasestr.c', 'compat/compat_posix_string.c',
+        'encodings/encoding_utf.c', 'file/file_path.c', 'file/retro_dirent.c',
+        'lists/string_list.c', 'lists/dir_list.c', 'memmap/memalign.c',
+        'string/stdstring.c', 'vfs/vfs_implementation.c'
+    ) | ForEach-Object { "$common/$_" }
+    & emcc $archive @support "-I$common/include" -O3 --no-entry -o $outJs `
         -s WASM=1 `
         -s MODULARIZE=1 `
         -s EXPORT_NAME=createGenesisPlusGX `
@@ -96,5 +111,6 @@ try {
         ForEach-Object { '  {0}  {1:N1} MB' -f $_.Name, ($_.Length / 1MB) }
 }
 finally {
+    if ($archive -and (Test-Path -LiteralPath $archive)) { Remove-Item -LiteralPath $archive }
     Pop-Location
 }

@@ -7,7 +7,7 @@
 // A session is: boot core -> load ROM from bytes -> unserialize a fixture ->
 // then once per 4 emulator frames: observe, decide, act.
 
-import { Policy } from "./policy.js?v=15";
+import { Policy } from "./policy.js?v=19";
 import { Observer, decodeFrame } from "./observer.js?v=9";
 import { expandAction } from "./actions.js?v=10";
 
@@ -43,14 +43,12 @@ export class InputFifo {
   }
 
   /** Push this frame's request and return the mask to apply now. */
-  next(request, base = 0, frozen = false) {
-    if (!frozen) {
-      const delayed = this.p > 0 && Math.random() < this.p;
-      const d = delayed ? 1 + Math.floor(Math.random() * 5) : 0;
-      this.release = Math.max(this.tick + base + d, this.release);
-      this.lastDelay = this.release - this.tick;
-      this.pending.push([this.release, request]);
-    }
+  next(request, base = 0) {
+    const delayed = this.p > 0 && Math.random() < this.p;
+    const d = delayed ? 1 + Math.floor(Math.random() * 5) : 0;
+    this.release = Math.max(this.tick + base + d, this.release);
+    this.lastDelay = this.release - this.tick;
+    this.pending.push([this.release, request]);
     while (this.pending.length && this.pending[0][0] <= this.tick) {
       this.current = this.pending.shift()[1];
     }
@@ -60,7 +58,7 @@ export class InputFifo {
 }
 
 // Bump this whenever a ladder fixture is regenerated.
-export const FIXTURE_VERSION = 3;
+export const FIXTURE_VERSION = 4;
 
 export class LiveSession {
   constructor(opts = {}) {
@@ -74,17 +72,15 @@ export class LiveSession {
     this.frameCopy = null;
     this.ramPtr = 0;
     this.joy = 0;
-    this.frozen = false;
-    this.frozenMask = 0;
+    this.inputPaused = false;
+    this.interruptedMacro = false;
     this.fifo = new InputFifo(0.05);
     this.baseDelay = 0;             // fixed capture->execution delay, frames
-    this.spaceDelay = 6;            // extra delay while Space is held
-    this.spaceHeld = false;
     this.policy = null;
     this.observer = null;
     this.macroFrame = 0;
     this.pixelCanvas = document.createElement("canvas");
-    this.stats = { decisions: 0, frames: 0, p1KO: 0, p2KO: 0, frozen: 0 };
+    this.stats = { decisions: 0, frames: 0, p1KO: 0, p2KO: 0 };
   }
 
   async loadCore() {
@@ -153,12 +149,10 @@ export class LiveSession {
     return this.ramPtr;
   }
 
-  async loadFixture(url = this.fixtureUrl, file = null) {
+  async loadFixture(url = this.fixtureUrl) {
     const M = this.M;
-    const source = file ?? await fetch(url);
-    if (!file && !source.ok) {
-      throw Object.assign(new Error(`存档载入失败（HTTP ${source.status}）`), { status: source.status });
-    }
+    const source = await fetch(url);
+    if (!source.ok) throw new Error(`关卡存档载入失败（HTTP ${source.status}）`);
     let st = new Uint8Array(await source.arrayBuffer());
 
     // Ladder fixtures ship gzipped (1 MB of state compresses to ~40 KB).
@@ -172,7 +166,7 @@ export class LiveSession {
 
     if (st.length !== M._retro_serialize_size()
         || new TextDecoder().decode(st.subarray(0, 16)) !== "GENPLUS-GX 1.7.6") {
-      throw new Error("请选择网页专用的 Genesis Plus GX 1.7.6 存档");
+      throw new Error("关卡存档的 Genesis Plus GX 格式无效");
     }
     const sp = M._malloc(st.length);
     M.HEAPU8.set(st, sp);
@@ -271,9 +265,14 @@ export class LiveSession {
     return this.observer;
   }
 
-  setFrozen(on) {
-    this.frozen = !!on;
-    return this.frozen;
+  setInputPaused(paused) {
+    if (this.inputPaused === paused) return;
+    this.inputPaused = paused;
+    if (paused) {
+      this.interruptedMacro = true;
+      this.fifo.reset();
+      this.joy = 0;
+    }
   }
 
   /** Fixed input delay in frames (0 = none). */
@@ -287,16 +286,6 @@ export class LiveSession {
     const v = Math.max(0, Math.min(1, Number(p) || 0));
     this.fifo.p = v;
     return v;
-  }
-
-  /** Space held: adds spaceDelay frames on top of the base delay. */
-  setSpaceHeld(on) {
-    this.spaceHeld = !!on;
-    return this.spaceHeld;
-  }
-
-  get effectiveDelay() {
-    return this.baseDelay + (this.spaceHeld ? this.spaceDelay : 0);
   }
 
   /**
@@ -318,9 +307,12 @@ export class LiveSession {
   }
 
   beginMacro() {
-    const o = this.observer.obs();
-    const { logits } = this.policy.forward(o.image, o.hist);
-    this.action = this.policy.argmax(logits);
+    this.interruptedMacro = false;
+    this.action = 0;
+    if (!this.inputPaused) {
+      const { image, hist } = this.observer.obs();
+      this.action = this.policy.argmax(this.policy.forward(image, hist).logits);
+    }
     const p1x = this.ram16(P1_X), p2x = this.ram16(P2_X);
     this.opponentRight = p2x > p1x;
     this.masks = expandAction(this.action, this.opponentRight);
@@ -331,15 +323,16 @@ export class LiveSession {
   /** Advance one physical frame, returning a result when the macro completes. */
   stepFrame() {
     if (this.macroFrame === 0) this.beginMacro();
-    this.joy = this.fifo.next(this.masks[this.macroFrame], this.effectiveDelay, this.frozen);
+    const neutral = this.inputPaused || this.interruptedMacro;
+    this.joy = neutral ? 0 : this.fifo.next(this.masks[this.macroFrame], this.baseDelay);
     this.M._retro_run();
     this.stats.frames++;
     this.macroFrame = (this.macroFrame + 1) % 4;
     if (this.macroFrame !== 0) return null;
-    if (this.frozen) this.stats.frozen++;
 
+    const action = neutral ? 0 : this.action;
     const rgb = decodeFrame(this.frameCopy, this.cb.w, this.cb.h, this.cb.pitch, 2);
-    this.observer.push(rgb, this.cb.w, this.cb.h, this.action);
+    this.observer.push(rgb, this.cb.w, this.cb.h, action);
 
     const dead2 = this.p2hp <= 0 || this.p2hp >= 0xff00;
     const dead1 = this.p1hp <= 0 || this.p1hp >= 0xff00;
@@ -347,7 +340,7 @@ export class LiveSession {
     if (!this.wasDead1 && dead1) this.stats.p1KO++;
 
     this.stats.decisions++;
-    return { action: this.action, p1hp: this.p1hp, p2hp: this.p2hp, opponentRight: this.opponentRight };
+    return { action, p1hp: this.p1hp, p2hp: this.p2hp, opponentRight: this.opponentRight };
   }
 
   /** Complete one policy decision in a blocking loop for headless checks. */
