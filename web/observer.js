@@ -117,7 +117,9 @@ export class Observer {
       let s = ((top + y) * width + left) * 3;
       let d = y * cw;
       for (let x = 0; x < cw; x++, s += 3, d++) {
-        grayBuf[d] = (rgb[s] * 0.299 + rgb[s + 1] * 0.587 + rgb[s + 2] * 0.114) | 0;
+        // cv2.COLOR_RGB2GRAY rounds; truncating here shifted the whole motion
+        // histogram by a level.
+        grayBuf[d] = Math.round(rgb[s] * 0.299 + rgb[s + 1] * 0.587 + rgb[s + 2] * 0.114);
       }
     }
     return grayBuf;
@@ -140,28 +142,30 @@ export class Observer {
         const d2 = Math.abs(m[2][i] - m[4][i]);
         a[i] = d1 > d2 ? d1 : d2;
       }
-      // 5x5 gaussian, replicate edges
-      const blur = new Float32Array(cw * ch);
+      // 5x5 gaussian (sigma 1.1) with cv2's reflect-101 borders, rounded back
+      // to uint8 like GaussianBlur does on 8-bit input.
+      const blur = new Uint8Array(cw * ch);
+      const mirror = (i, n) => (i < 0 ? -i : i >= n ? 2 * (n - 1) - i : i);
       for (let y = 0; y < ch; y++) {
         for (let x = 0; x < cw; x++) {
           let acc = 0;
           let ki = 0;
           for (let ky = -2; ky <= 2; ky++) {
-            const yy = Math.min(ch - 1, Math.max(0, y + ky));
+            const yy = mirror(y + ky, ch);
             for (let kx = -2; kx <= 2; kx++, ki++) {
-              const xx = Math.min(cw - 1, Math.max(0, x + kx));
+              const xx = mirror(x + kx, cw);
               acc += a[yy * cw + xx] * GAUSS5[ki];
             }
           }
-          blur[y * cw + x] = acc;
+          const v = Math.round(acc);
+          blur[y * cw + x] = v < 0 ? 0 : v > 255 ? 255 : v;
         }
       }
       // Otsu
       const hist = new Float64Array(256);
       let total = 0;
       for (let i = 0; i < blur.length; i++) {
-        const v = blur[i] < 0 ? 0 : blur[i] > 255 ? 255 : blur[i] | 0;
-        hist[v]++;
+        hist[blur[i]]++;
         total++;
       }
       let sumAll = 0;
@@ -270,7 +274,7 @@ function resize84(src, sw, sh) {
       for (let c = 0; c < 3; c++) {
         const top = src[i00 + c] * (1 - wx) + src[i01 + c] * wx;
         const bot = src[i10 + c] * (1 - wx) + src[i11 + c] * wx;
-        out[o + c] = (top * (1 - wy) + bot * wy) | 0;
+        out[o + c] = Math.round(top * (1 - wy) + bot * wy);
       }
     }
   }
