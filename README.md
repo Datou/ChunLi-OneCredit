@@ -4,12 +4,46 @@
 
 [网页实战](https://datou.github.io/ChunLi-OneCredit/) · [下载模型](https://github.com/Datou/ChunLi-OneCredit/releases/latest) · [制作存档](docs/savestates.md) · [训练与复测](docs/training.md)
 
+## 网页实战
+
+<p align="center">
+  <img src="docs/media/web-desktop.png" width="620" alt="桌面端实机画面">
+</p>
+
+<p align="center">
+  <a href="docs/media/one-credit.mp4"><img src="docs/media/video-poster.jpg" width="420" alt="点击播放 24 秒实机片段"></a>
+  <br>
+  <sub>点击封面观看 24 秒实机片段（浏览器里跑模拟器 + 策略）</sub>
+</p>
+
+<p align="center">
+  <img src="docs/media/web-mobile.png" width="300" alt="手机端实机画面">
+  <br>
+  <sub>手机端：默认 2× 渲染，按住画面下方按钮可切断春丽的输入</sub>
+</p>
+
+网页用 WASM 模拟器实时运行同一份权重，并在浏览器本地校验 ROM（SHA-256）。打开页面后会静默预载模拟器、当前关卡存档和策略权重，选 ROM 后通常不到 1 秒即可开打；界面支持中英文切换（右上角 `EN` / `中文`）。桌面按屏幕像素 1:1 渲染以保证扫描线均匀，手机默认 2× 以控制开销。
+
 ## 训练结果
 
 | 冻结权重评测 | 无抖动 | 5% 输入抖动 |
 | --- | ---: | ---: |
 | 自然赛程通关 | **88/100** | **84/100** |
 | 每关独立开局的单场胜利 | 95/96 | 92/96 |
+
+![自然赛程通关率与单场胜率](docs/media/clear-rate.png)
+
+上图：左为 100 次自然赛程的一币通关率（误差线为 95% Wilson 区间），右为每关独立开局的单场胜率。
+
+![逐关胜率](docs/media/per-opponent.png)
+
+上图：12 名对手的逐关胜率，条末数字为「获胜/到达」。将军和肯是主要失分点，古烈与沙加特次之。
+
+![一币赛程赢场分布](docs/media/wins-distribution.png)
+
+上图：一币赛程的赢场分布（对数刻度）。大多数失败发生在第 12 场，少数在第 6–11 场被终结。
+
+图表由 `scripts/make_readme_charts.py` 从 `results/summary.json` 和 `results/one-credit.jsonl` 生成，改数据后重跑即可；重新出图需要 matplotlib。
 
 连续赛程只在开始时加载第 1 关，之后由游戏推进，无中途读档或续币。连续赛程的 95% Wilson 区间分别为 80.2–93.0% 和 75.6–89.9%。5% 表示每个物理帧有 5% 概率将该帧输入延后 1–5 帧。表中统计来自 Python 锁步模拟；另有一次选定条件下的原生实时运行在 5% 抖动下连赢 12 场。[连续赛程逐场结果](results/one-credit.jsonl) · [评测摘要](results/summary.json) · [实时运行记录](results/realtime-clear.json)
 

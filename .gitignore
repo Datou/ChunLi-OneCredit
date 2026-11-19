@@ -10,6 +10,7 @@ __pycache__/
 *.bk2
 *.zip
 *.mp4
+!docs/media/*.mp4
 **/rom.md
 /roms/
 !/web/cores/fixtures/ladder/stage??.state.gz
