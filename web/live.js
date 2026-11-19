@@ -7,11 +7,11 @@
 // A session is: boot core -> load ROM from bytes -> unserialize a fixture ->
 // then once per 4 emulator frames: observe, decide, act.
 
-import { Policy } from "./policy.js?v=24";
+import { Policy } from "./policy.js?v=25";
 import { Observer, decodeFrame } from "./observer.js?v=9";
-import { expandAction } from "./actions.js?v=24";
-import { download, withDeadline } from "./assets.js?v=24";
-import { t } from "./i18n.js?v=24";
+import { expandAction } from "./actions.js?v=25";
+import { download, withDeadline } from "./assets.js?v=25";
+import { t } from "./i18n.js?v=25";
 
 const RETRO_MEMORY_SYSTEM_RAM = 2;
 
@@ -329,7 +329,10 @@ export class LiveSession {
     const cropW = Math.min(256, w);
     const cropH = Math.min(200, h);
     const x0 = (w - cropW) >> 1;
-    const y0 = (h - cropH) >> 1;
+    // This game's 256x224 frame puts the 200-line playfield at row 16 (16 dark
+    // lines above, 8 below).  Centring the crop would keep 4 of those top lines
+    // as a black band across the top of the canvas.
+    const y0 = h >= cropH + 16 ? h - cropH - 8 : (h - cropH) >> 1;
     const cv = this.pixelCanvas;
     if (cv.width !== cropW || cv.height !== cropH) { cv.width = cropW; cv.height = cropH; }
     const ctx = cv.getContext("2d");

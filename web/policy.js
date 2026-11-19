@@ -4,8 +4,8 @@
 // fast: about 10 M multiply-adds per decision, and the policy only decides once
 // every 4 frames (15 Hz).  That removes any need for ONNX Runtime or a CDN.
 //
-import { download } from "./assets.js?v=24";
-import { t } from "./i18n.js?v=24";
+import { download } from "./assets.js?v=25";
+import { t } from "./i18n.js?v=25";
 
 // Architecture (mirrors chunppo/policy.py + SB3 NatureCNN):
 //   image 84x84x3 --conv8/4--> 32@20 --conv4/2--> 64@9 --conv3/1--> 64@7

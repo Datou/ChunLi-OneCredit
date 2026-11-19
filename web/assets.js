@@ -1,4 +1,4 @@
-import { t } from "./i18n.js?v=24";
+import { t } from "./i18n.js?v=25";
 
 /** Download an asset, timing out stalled connections and allowing slow transfers. */
 export async function download(url, { signal, onProgress, idleMs = 25_000 } = {}) {

@@ -5,10 +5,10 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=15";
-import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=24";
-import { actionLabels } from "./actions.js?v=24";
-import { withDeadline } from "./assets.js?v=24";
-import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=24";
+import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=25";
+import { actionLabels } from "./actions.js?v=25";
+import { withDeadline } from "./assets.js?v=25";
+import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=25";
 
 const NATIVE = { w: 256, h: 200 }; // game pixels after the standard crop
 const FRAME_MS = 1000 / 59.92274340431231;
@@ -45,9 +45,8 @@ const el = {
   drawer: $("drawer"),
   romFile: $("romFile"),
   gateTitle: $("gateTitle"),
-  romSummary: $("romSummary"),
   romStatus: $("romStatus"),
-  romName: $("romName"),
+  romStatus: $("romStatus"),
   romDetail: $("romDetail"),
   launch: $("launch"),
   launchLabel: $("launchLabel"),
@@ -132,13 +131,12 @@ function renderLaunchError() {
 function renderRom() {
   const rom = view.rom;
   if (!rom) return;
-  el.romSummary.hidden = false;
-  el.romSummary.dataset.status = rom.status;
+  el.romStatus.hidden = false;
+  el.romStatus.dataset.status = rom.status;
   el.romStatus.textContent = t(rom.key, rom.params);
-  el.romName.textContent = rom.file.name;
-  el.romName.title = rom.file.name;
   const detail = rom.detailKey ? t(rom.detailKey, rom.detailParams) : "";
   el.romDetail.textContent = detail;
+  el.romDetail.dataset.status = rom.status;
   el.romDetail.hidden = !detail;
 }
 
@@ -351,8 +349,8 @@ const ROM_SPEC = {
 };
 const fixtureUrlFor = (stage) => `cores/fixtures/ladder/${stage}.state.gz?v=${FIXTURE_VERSION}`;
 
-function showRomStatus(file, key, params = {}, status = "pending", detailKey = null, detailParams = {}) {
-  view.rom = { file, key, params, status, detailKey, detailParams };
+function showRomStatus(key, params = {}, status = "pending", detailKey = null, detailParams = {}) {
+  view.rom = { key, params, status, detailKey, detailParams };
   renderRom();
 }
 
@@ -369,11 +367,19 @@ function escapeHtml(s) {
 /** Pick a ROM: verify it, then start the fight straight away. */
 async function handleRom(file) {
   if (!file || state.busy || state.validating) return;
+  // A new pick replaces the running match, so the verdict stays in sight.
+  state.session?.dispose?.();
+  state.session = null;
+  state.lastAction = undefined;
+  clearInputHold();
+  el.gate.classList.remove("hidden");
   el.launch.hidden = true;
+  el.note.textContent = "";
   setGateTitle("gate.title");
-  showRomStatus(file, "rom.verifying");
+  syncBattleControls();
+  showRomStatus("rom.verifying");
   if (file.size !== ROM_SPEC.size) {
-    showRomStatus(file, "rom.mismatch", {}, "error", "rom.badSize.detail", {
+    showRomStatus("rom.mismatch", {}, "error", "rom.badSize.detail", {
       size: file.size.toLocaleString(),
       required: ROM_SPEC.size.toLocaleString(),
     });
@@ -389,12 +395,11 @@ async function handleRom(file) {
     const bytes = new Uint8Array(data);
     const hex = await withDeadline(sha256Hex(bytes), 15_000, t("rom.shaTimeout"));
     if (!hex) {
-      showRomStatus(file, "rom.unverified", {}, "error", "rom.noCrypto.detail");
+      showRomStatus("rom.unverified", {}, "error", "rom.noCrypto.detail");
       return;
     }
     if (hex !== ROM_SPEC.sha256) {
-      showRomStatus(file, "rom.mismatch", {}, "error", "rom.badHash.detail", {
-        name: ROM_SPEC.name,
+      showRomStatus("rom.mismatch", {}, "error", "rom.badHash.detail", {
         expected: ROM_SPEC.sha256,
         actual: hex,
       });
@@ -403,9 +408,9 @@ async function handleRom(file) {
     state.romBytes = bytes;
     state.rom = { name: file.name, size: file.size, hash: hex };
     verified = true;
-    showRomStatus(file, "rom.ok", {}, "ok");
+    showRomStatus("rom.ok", {}, "ok");
   } catch (err) {
-    showRomStatus(file, "rom.unreadable", {}, "error", "error.raw", { message: String(err.message || err) });
+    showRomStatus("rom.unreadable", {}, "error", "error.raw", { message: String(err.message || err) });
   } finally {
     state.validating = false;
     syncBattleControls();

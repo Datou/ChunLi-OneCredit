@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chun-Li One Credit · 春丽一命通关</title>
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 <header class="bar">
@@ -40,21 +40,18 @@
       <button id="fullscreen" class="btn" type="button" disabled data-i18n="fullscreen">全屏</button>
       <button id="sound" class="btn" type="button" hidden data-i18n="sound.enable">启用声音</button>
     </div>
-    <div class="rom-status" id="romSummary" role="status" hidden>
-      <p class="rom-line">
-        <strong id="romStatus"></strong>
-        <span id="romName"></span>
-      </p>
-      <p id="romDetail" class="rom-detail" hidden></p>
-    </div>
     <div class="stage" id="stage" tabindex="-1" aria-label="游戏画面" data-i18n-aria="stage.screen">
       <canvas id="view" width="768" height="600"></canvas>
     </div>
     <div class="gate" id="gate">
       <h2 id="gateTitle" data-i18n="gate.title">载入 ROM，观看春丽实战</h2>
       <p>Mega Drive · Street Fighter II' – Special Champion Edition (USA)</p>
-      <label class="rom-picker" for="romFile" data-i18n="gate.picker">选择 ROM</label>
-      <input type="file" id="romFile" accept=".md,.gen,.bin,.smd" class="sr-only">
+      <div class="rom-pick">
+        <label class="rom-picker" for="romFile" data-i18n="gate.picker">选择 ROM</label>
+        <input type="file" id="romFile" accept=".md,.gen,.bin,.smd" class="sr-only">
+        <p class="rom-verdict" id="romStatus" role="status" hidden></p>
+      </div>
+      <p class="rom-detail" id="romDetail" hidden></p>
       <p class="hint" data-i18n="gate.hint">3,145,728 字节 · 文件仅在浏览器本地读取</p>
       <div class="launch" id="launch" aria-label="预载与启动进度" data-i18n-aria="launch.label" hidden>
         <p class="launch-label" id="launchLabel">启动中</p>
@@ -140,6 +137,6 @@
   </div>
 </aside>
 
-<script src="app.js?v=24" type="module"></script>
+<script src="app.js?v=25" type="module"></script>
 </body>
 </html>

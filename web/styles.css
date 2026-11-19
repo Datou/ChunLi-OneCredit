@@ -97,24 +97,16 @@ select {
 .file::file-selector-button { margin-right: .65rem; }
 .gate .file::file-selector-button { background: var(--blue); border-color: var(--blue); color: #0c1729; }
 .note.warn { color: var(--danger); overflow-wrap: anywhere; }
-.rom-status {
-  display: grid;
-  gap: .1rem;
-  padding: .45rem 1rem .5rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--muted);
-  background: #10172a;
-  font-size: .875rem;
-}
-.rom-line { display: flex; gap: .6rem; align-items: baseline; min-width: 0; margin: 0; }
-.rom-status strong { white-space: nowrap; color: var(--text); }
-.rom-status .rom-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rom-status[data-status="ok"] strong, .launch dd[data-status="ok"] { color: var(--blue); }
-.rom-status[data-status="error"] strong, .launch dd[data-status="error"] { color: var(--danger); }
-.rom-status[data-status="ok"] strong::before { content: "✓ "; }
-.rom-status[data-status="error"] strong::before { content: "✗ "; }
+.rom-pick { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; }
+.rom-verdict { margin: 0; color: var(--muted); font-size: .875rem; }
+.rom-verdict[data-status="ok"] { color: var(--blue); }
+.rom-verdict[data-status="error"] { color: var(--danger); }
+.rom-verdict[data-status="ok"]::before { content: "✓ "; }
+.rom-verdict[data-status="error"]::before { content: "✗ "; }
 .rom-detail { margin: 0; color: var(--muted); font-size: .8125rem; overflow-wrap: anywhere; }
-.rom-status[data-status="error"] .rom-detail { color: var(--danger); }
+.rom-detail[data-status="error"] { color: var(--danger); }
+.launch dd[data-status="ok"] { color: var(--blue); }
+.launch dd[data-status="error"] { color: var(--danger); }
 .hint { color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
 .launch { width: min(100%, 26rem); }
 .launch-label { margin: .1rem 0 .25rem; color: var(--text); font-size: .8125rem; font-weight: 600; }
