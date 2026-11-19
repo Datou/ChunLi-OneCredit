@@ -17,19 +17,15 @@ export const HIST_LEN = 24;
 export const N_ACTIONS = 27;
 
 const GAUSS5 = (() => {
-  // cv2.GaussianBlur(ksize=5, sigma=0) -> sigma = 0.3*((5-1)*0.5-1)+0.8 = 1.1
-  const sigma = 1.1;
-  const r = 2;
-  const k = [];
-  let sum = 0;
-  for (let y = -r; y <= r; y++) {
-    for (let x = -r; x <= r; x++) {
-      const v = Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
-      k.push(v);
-      sum += v;
-    }
+  // cv2.GaussianBlur(ksize=5, sigma=0) resolves to getGaussianKernel's
+  // small-gaussian table, i.e. the binomial [1,4,6,4,1]/16 per axis -- not a
+  // sigma=1.1 Gaussian.  Using the wrong kernel shifted the motion mask edges.
+  const k = [1, 4, 6, 4, 1];
+  const out = [];
+  for (let y = 0; y < 5; y++) {
+    for (let x = 0; x < 5; x++) out.push((k[y] * k[x]) / 256);
   }
-  return k.map((v) => v / sum);
+  return out;
 })();
 
 /** Decode one emulator frame into packed RGB888. */

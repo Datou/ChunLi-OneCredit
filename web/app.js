@@ -5,7 +5,7 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=16";
-import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=30";
+import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=31";
 import { actionLabels } from "./actions.js?v=29";
 import { withDeadline } from "./assets.js?v=29";
 import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=29";
