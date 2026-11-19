@@ -11,9 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/one-credit.mp4"><img src="docs/media/video-poster.jpg" width="420" alt="点击播放 24 秒实机片段"></a>
-  <br>
-  <sub>点击封面观看 24 秒实机片段（浏览器里跑模拟器 + 策略）</sub>
+  <a href="docs/media/one-credit.mp4">▶ 观看 24 秒实机片段（浏览器里跑模拟器 + 策略）</a>
 </p>
 
 网页用 WASM 模拟器实时运行同一份权重，并在浏览器本地校验 ROM（SHA-256）。打开页面后会静默预载模拟器、当前关卡存档和策略权重，选 ROM 后通常不到 1 秒即可开打；界面支持中英文切换（右上角 `EN` / `中文`）。桌面按屏幕像素 1:1 渲染以保证扫描线均匀，手机默认 2× 以控制开销。
