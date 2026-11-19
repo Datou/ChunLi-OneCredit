@@ -1,0 +1,175 @@
+{
+  "model_sha256": "dcb965990a855250d170a31b493af3e8e774c3e642c73b6f8457b788a77f7bf9",
+  "job": {
+    "offset": 87,
+    "jitter": 0.05,
+    "seed": 140223910,
+    "deterministic": true
+  },
+  "cleared": true,
+  "reason": "cleared",
+  "wins": 12,
+  "matches": [
+    {
+      "enemy": 5,
+      "stage": 1,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 0,
+      "frames": 2036
+    },
+    {
+      "enemy": 6,
+      "stage": 2,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 110,
+      "frames": 2688
+    },
+    {
+      "enemy": 7,
+      "stage": 3,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 24,
+      "frames": 1952
+    },
+    {
+      "enemy": 0,
+      "stage": 4,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        1
+      ],
+      "dealt": 489,
+      "taken": 230,
+      "frames": 4752
+    },
+    {
+      "enemy": 1,
+      "stage": 5,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 0,
+      "frames": 2076
+    },
+    {
+      "enemy": 2,
+      "stage": 6,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 0,
+      "frames": 2756
+    },
+    {
+      "enemy": 3,
+      "stage": 7,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 151,
+      "frames": 3804
+    },
+    {
+      "enemy": 4,
+      "stage": 8,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 146,
+      "frames": 2484
+    },
+    {
+      "enemy": 10,
+      "stage": 9,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 159,
+      "frames": 2564
+    },
+    {
+      "enemy": 11,
+      "stage": 10,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 149,
+      "frames": 3252
+    },
+    {
+      "enemy": 9,
+      "stage": 11,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        1
+      ],
+      "dealt": 458,
+      "taken": 401,
+      "frames": 4344
+    },
+    {
+      "enemy": 8,
+      "stage": 12,
+      "jitter": 0.05,
+      "win": true,
+      "score": [
+        2,
+        0
+      ],
+      "dealt": 352,
+      "taken": 159,
+      "frames": 3080
+    }
+  ],
+  "mid_campaign_loads": 0,
+  "campaign_frames": 62264,
+  "selected_existing_successful_case": true,
+  "video_frames": 64064,
+  "audio_rate": 44100
+}

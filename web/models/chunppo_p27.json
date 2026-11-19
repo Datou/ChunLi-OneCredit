@@ -1,0 +1,138 @@
+{
+  "source": "chunli-ppo.zip",
+  "params": 3403580,
+  "nActions": 27,
+  "histLen": 24,
+  "histDim": 648,
+  "imageSize": 84,
+  "dtype": "float32",
+  "endian": "little",
+  "tensors": [
+    {
+      "name": "features_extractor.cnn.cnn.0.weight",
+      "shape": [
+        32,
+        3,
+        8,
+        8
+      ],
+      "offset": 0,
+      "count": 6144
+    },
+    {
+      "name": "features_extractor.cnn.cnn.0.bias",
+      "shape": [
+        32
+      ],
+      "offset": 24576,
+      "count": 32
+    },
+    {
+      "name": "features_extractor.cnn.cnn.2.weight",
+      "shape": [
+        64,
+        32,
+        4,
+        4
+      ],
+      "offset": 24704,
+      "count": 32768
+    },
+    {
+      "name": "features_extractor.cnn.cnn.2.bias",
+      "shape": [
+        64
+      ],
+      "offset": 155776,
+      "count": 64
+    },
+    {
+      "name": "features_extractor.cnn.cnn.4.weight",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "offset": 156032,
+      "count": 36864
+    },
+    {
+      "name": "features_extractor.cnn.cnn.4.bias",
+      "shape": [
+        64
+      ],
+      "offset": 303488,
+      "count": 64
+    },
+    {
+      "name": "features_extractor.cnn.linear.0.weight",
+      "shape": [
+        1024,
+        3136
+      ],
+      "offset": 303744,
+      "count": 3211264
+    },
+    {
+      "name": "features_extractor.cnn.linear.0.bias",
+      "shape": [
+        1024
+      ],
+      "offset": 13148800,
+      "count": 1024
+    },
+    {
+      "name": "features_extractor.hist.0.weight",
+      "shape": [
+        128,
+        648
+      ],
+      "offset": 13152896,
+      "count": 82944
+    },
+    {
+      "name": "features_extractor.hist.0.bias",
+      "shape": [
+        128
+      ],
+      "offset": 13484672,
+      "count": 128
+    },
+    {
+      "name": "action_net.weight",
+      "shape": [
+        27,
+        1152
+      ],
+      "offset": 13485184,
+      "count": 31104
+    },
+    {
+      "name": "action_net.bias",
+      "shape": [
+        27
+      ],
+      "offset": 13609600,
+      "count": 27
+    },
+    {
+      "name": "value_net.weight",
+      "shape": [
+        1,
+        1152
+      ],
+      "offset": 13609708,
+      "count": 1152
+    },
+    {
+      "name": "value_net.bias",
+      "shape": [
+        1
+      ],
+      "offset": 13614316,
+      "count": 1
+    }
+  ],
+  "checkpoint_sha256": "37e5d8e68231ad8f9fd4420457f593cab02eae43ac9be494b49ff26c45a80345"
+}

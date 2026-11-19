@@ -1,0 +1,368 @@
+{
+  "model_stored_timesteps": 270018560,
+  "original_checkpoint_sha256": "dcb965990a855250d170a31b493af3e8e774c3e642c73b6f8457b788a77f7bf9",
+  "release_checkpoint_sha256": "37e5d8e68231ad8f9fd4420457f593cab02eae43ac9be494b49ff26c45a80345",
+  "policy_pth_sha256": "709d7af4da0749df48389617c89ad287e9786e42a2c3c2667ef0c8f8d5ea3305",
+  "natural_campaign_protocol": {
+    "seed": 9071106,
+    "jobs": 200,
+    "hist_len": 24,
+    "delay": 0,
+    "initial_stage": 1,
+    "mid_campaign_loads_allowed": 0,
+    "continue_after_lost_match": false,
+    "sync_round_observation": true
+  },
+  "natural_campaigns": {
+    "0.0": {
+      "campaign_clears": "88/100",
+      "campaign_clear_rate": 0.88,
+      "campaign_ci95": [
+        0.8019,
+        0.93
+      ],
+      "campaign_mean_wins": 11.66,
+      "campaign_max_wins": 12,
+      "per_opponent": {
+        "ChunLi": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Zangief": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Dhalsim": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Ryu": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "EHonda": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Blanka": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Guile": {
+          "reached": 100,
+          "wins": 99,
+          "losses": 1,
+          "win_rate": 0.99
+        },
+        "Ken": {
+          "reached": 99,
+          "wins": 97,
+          "losses": 2,
+          "win_rate": 0.9798
+        },
+        "Balrog": {
+          "reached": 97,
+          "wins": 95,
+          "losses": 2,
+          "win_rate": 0.9794
+        },
+        "Vega": {
+          "reached": 95,
+          "wins": 94,
+          "losses": 1,
+          "win_rate": 0.9895
+        },
+        "Sagat": {
+          "reached": 94,
+          "wins": 93,
+          "losses": 1,
+          "win_rate": 0.9894
+        },
+        "Bison": {
+          "reached": 93,
+          "wins": 88,
+          "losses": 5,
+          "win_rate": 0.9462
+        }
+      },
+      "campaign_stop_reasons": {
+        "lost_match": 12,
+        "cleared": 88
+      },
+      "losses_by_opponent": {
+        "Bison": 5,
+        "Ken": 2,
+        "Balrog": 2,
+        "Vega": 1,
+        "Guile": 1,
+        "Sagat": 1
+      },
+      "paired_improved_clears": 8,
+      "paired_regressed_clears": 9
+    },
+    "0.05": {
+      "campaign_clears": "84/100",
+      "campaign_clear_rate": 0.84,
+      "campaign_ci95": [
+        0.7558,
+        0.899
+      ],
+      "campaign_mean_wins": 11.46,
+      "campaign_max_wins": 12,
+      "per_opponent": {
+        "ChunLi": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Zangief": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Dhalsim": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Ryu": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "EHonda": {
+          "reached": 100,
+          "wins": 100,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Blanka": {
+          "reached": 100,
+          "wins": 99,
+          "losses": 1,
+          "win_rate": 0.99
+        },
+        "Guile": {
+          "reached": 99,
+          "wins": 97,
+          "losses": 2,
+          "win_rate": 0.9798
+        },
+        "Ken": {
+          "reached": 97,
+          "wins": 93,
+          "losses": 4,
+          "win_rate": 0.9588
+        },
+        "Balrog": {
+          "reached": 93,
+          "wins": 93,
+          "losses": 0,
+          "win_rate": 1.0
+        },
+        "Vega": {
+          "reached": 93,
+          "wins": 91,
+          "losses": 2,
+          "win_rate": 0.9785
+        },
+        "Sagat": {
+          "reached": 91,
+          "wins": 89,
+          "losses": 2,
+          "win_rate": 0.978
+        },
+        "Bison": {
+          "reached": 89,
+          "wins": 84,
+          "losses": 5,
+          "win_rate": 0.9438
+        }
+      },
+      "campaign_stop_reasons": {
+        "lost_match": 16,
+        "cleared": 84
+      },
+      "losses_by_opponent": {
+        "Guile": 2,
+        "Ken": 4,
+        "Bison": 5,
+        "Vega": 2,
+        "Sagat": 2,
+        "Blanka": 1
+      },
+      "paired_improved_clears": 18,
+      "paired_regressed_clears": 13
+    }
+  },
+  "independent_fixtures": {
+    "0.0": {
+      "fixture_win": 0.9896,
+      "wins": 95,
+      "n": 96,
+      "fixture_ci95": [
+        0.9433,
+        0.9982
+      ],
+      "per_stage": {
+        "1": "8/8",
+        "2": "8/8",
+        "3": "8/8",
+        "4": "8/8",
+        "5": "8/8",
+        "6": "8/8",
+        "7": "8/8",
+        "8": "8/8",
+        "9": "8/8",
+        "10": "8/8",
+        "11": "8/8",
+        "12": "7/8"
+      },
+      "per_stage_ci95": {
+        "1": [
+          0.6756,
+          1.0
+        ],
+        "2": [
+          0.6756,
+          1.0
+        ],
+        "3": [
+          0.6756,
+          1.0
+        ],
+        "4": [
+          0.6756,
+          1.0
+        ],
+        "5": [
+          0.6756,
+          1.0
+        ],
+        "6": [
+          0.6756,
+          1.0
+        ],
+        "7": [
+          0.6756,
+          1.0
+        ],
+        "8": [
+          0.6756,
+          1.0
+        ],
+        "9": [
+          0.6756,
+          1.0
+        ],
+        "10": [
+          0.6756,
+          1.0
+        ],
+        "11": [
+          0.6756,
+          1.0
+        ],
+        "12": [
+          0.5291,
+          0.9776
+        ]
+      },
+      "paired_improved": 1,
+      "paired_regressed": 1,
+      "truncated": 0
+    },
+    "0.05": {
+      "fixture_win": 0.9583,
+      "wins": 92,
+      "n": 96,
+      "fixture_ci95": [
+        0.8977,
+        0.9837
+      ],
+      "per_stage": {
+        "1": "8/8",
+        "2": "8/8",
+        "3": "8/8",
+        "4": "8/8",
+        "5": "7/8",
+        "6": "8/8",
+        "7": "8/8",
+        "8": "7/8",
+        "9": "8/8",
+        "10": "7/8",
+        "11": "8/8",
+        "12": "7/8"
+      },
+      "per_stage_ci95": {
+        "1": [
+          0.6756,
+          1.0
+        ],
+        "2": [
+          0.6756,
+          1.0
+        ],
+        "3": [
+          0.6756,
+          1.0
+        ],
+        "4": [
+          0.6756,
+          1.0
+        ],
+        "5": [
+          0.5291,
+          0.9776
+        ],
+        "6": [
+          0.6756,
+          1.0
+        ],
+        "7": [
+          0.6756,
+          1.0
+        ],
+        "8": [
+          0.5291,
+          0.9776
+        ],
+        "9": [
+          0.6756,
+          1.0
+        ],
+        "10": [
+          0.5291,
+          0.9776
+        ],
+        "11": [
+          0.6756,
+          1.0
+        ],
+        "12": [
+          0.5291,
+          0.9776
+        ]
+      },
+      "paired_improved": 7,
+      "paired_regressed": 3,
+      "truncated": 0
+    }
+  }
+}

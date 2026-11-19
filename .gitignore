@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+/generated_states/
+/runs/
+/_web_verify/
+*.state
+*.state.gz
+*.srm
+*.bk2
+*.zip
+*.mp4
+**/rom.md
+/roms/

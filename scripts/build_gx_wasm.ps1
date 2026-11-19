@@ -1,0 +1,100 @@
+# Build a browser-loadable Genesis Plus GX core that EXPORTS the libretro memory API.
+#
+# Why this exists
+# ---------------
+# EmulatorJS ships a Genesis Plus GX build whose 67 WASM exports are minified
+# (Ch, Dh, ...) and which does NOT export retro_get_memory_data, so a browser
+# frontend cannot read 68K work RAM.  The chunppo action table resolves FWD/BACK
+# from RAM (P1_X=0x8006 / P2_X=0x8286), so without RAM the policy cannot be
+# driven correctly.
+#
+# Upstream Genesis Plus GX (github.com/libretro/Genesis-Plus-GX) builds the full
+# libretro ABI, but its `platform=emscripten` target only produces LLVM bitcode
+# (genesis_plus_gx_libretro_emscripten.bc).  Linking that bitcode ourselves is
+# exactly where we choose the export list -- and we add retro_get_memory_data.
+#
+# Prerequisites (prepare once):
+#   * libretro/Genesis-Plus-GX checked out at b9c2316441978d4015ba30e9a95d9b0e6f8ee981
+#   * make on PATH            (conda: `conda install -c conda-forge make`)
+#   * emcc on PATH            (emsdk: `emsdk install latest && emsdk activate latest`)
+#
+# License: Genesis Plus GX is source-available under a NON-COMMERCIAL license
+# (see LICENSE.txt).  Building a modified core for personal use is fine; do not
+# redistribute the built binary commercially.
+
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)][string]$GxRoot,
+    [string]$OutDir   = (Join-Path $PSScriptRoot '../web/cores'),
+    [int]$Jobs        = 8
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Require-Command([string]$name, [string]$hint) {
+    if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
+        throw "missing '$name' on PATH. $hint"
+    }
+}
+
+Require-Command make "install GNU make (conda install -c conda-forge make)"
+Require-Command emcc "install Emscripten (emsdk install latest; emsdk activate latest)"
+
+if (-not (Test-Path "$GxRoot\Makefile.libretro")) { throw "Genesis Plus GX not found at $GxRoot" }
+foreach ($dep in 'libretro\libretro-common\include', 'libretro\deps\zlib-1.2.11') {
+    if (-not (Test-Path "$GxRoot\$dep")) { throw "missing dependency: $GxRoot\$dep" }
+}
+
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+$OutDir = (Resolve-Path -LiteralPath $OutDir).Path
+
+# Standard libretro frontend ABI, plus the memory accessors that this whole
+# exercise exists for.  malloc/free are needed to hand the ROM to the core.
+$exports = @(
+    '_retro_init', '_retro_deinit', '_retro_api_version',
+    '_retro_get_system_info', '_retro_get_system_av_info',
+    '_retro_set_environment', '_retro_set_video_refresh',
+    '_retro_set_audio_sample', '_retro_set_audio_sample_batch',
+    '_retro_set_input_poll', '_retro_set_input_state',
+    '_retro_set_controller_port_device',
+    '_retro_reset', '_retro_run',
+    '_retro_serialize_size', '_retro_serialize', '_retro_unserialize',
+    '_retro_cheat_reset', '_retro_cheat_set',
+    '_retro_load_game', '_retro_unload_game', '_retro_get_region',
+    '_retro_get_memory_data', '_retro_get_memory_size',
+    '_malloc', '_free'
+) -join ','
+
+Write-Host "== 1/2 compiling core to LLVM bitcode ==" -ForegroundColor Cyan
+Push-Location $GxRoot
+try {
+    & make platform=emscripten -j $Jobs
+    if ($LASTEXITCODE -ne 0) { throw "make failed with exit code $LASTEXITCODE" }
+
+    $bc = Get-ChildItem -Path $GxRoot -Filter '*_libretro_emscripten.bc' -Recurse |
+          Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $bc) { throw 'no *_libretro_emscripten.bc produced' }
+    Write-Host "bitcode: $($bc.FullName)  ($([math]::Round($bc.Length/1MB,1)) MB)"
+
+    Write-Host "== 2/2 linking standalone module with exported memory API ==" -ForegroundColor Cyan
+    $outJs = Join-Path $OutDir 'genesis_plus_gx.js'
+    & emcc $bc.FullName -O3 --no-entry -o $outJs `
+        -s WASM=1 `
+        -s MODULARIZE=1 `
+        -s EXPORT_NAME=createGenesisPlusGX `
+        -s ALLOW_MEMORY_GROWTH=1 `
+        -s INITIAL_MEMORY=67108864 `
+        -s FORCE_FILESYSTEM=1 `
+        -s ALLOW_TABLE_GROWTH=1 `
+        -s EXPORTED_FUNCTIONS="[$exports]" `
+        -s EXPORTED_RUNTIME_METHODS='["FS","addFunction","stringToUTF8","HEAPU8","HEAP32"]' `
+        -s ASSERTIONS=0
+    if ($LASTEXITCODE -ne 0) { throw "emcc link failed with exit code $LASTEXITCODE" }
+
+    Write-Host "`n== built ==" -ForegroundColor Green
+    Get-ChildItem $OutDir -Filter 'genesis_plus_gx.*' |
+        ForEach-Object { '  {0}  {1:N1} MB' -f $_.Name, ($_.Length / 1MB) }
+}
+finally {
+    Pop-Location
+}

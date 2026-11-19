@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chun-Li One Credit · 春丽一命通关</title>
+<link rel="stylesheet" href="styles.css?v=18">
+</head>
+<body>
+<header class="bar">
+  <h1>Chun-Li <em>One Credit</em><span>春丽一命通关</span></h1>
+  <div class="bar-actions">
+    <a class="btn" href="https://github.com/Datou/ChunLi-OneCredit">GitHub</a>
+    <button id="openSettings" class="btn" aria-haspopup="dialog" aria-expanded="false">
+      <span class="gear">⚙</span> 设置
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="cabinet" aria-label="实时对战">
+    <div class="cabinet-head">
+      <label for="stageSelect">起始关卡</label>
+      <select id="stageSelect">
+        <option value="stage01" selected>01 · 春丽（镜像）</option>
+        <option value="stage02">02 · 桑吉尔夫</option>
+        <option value="stage03">03 · 达尔锡</option>
+        <option value="stage04">04 · 隆</option>
+        <option value="stage05">05 · 本田</option>
+        <option value="stage06">06 · 布兰卡</option>
+        <option value="stage07">07 · 古烈</option>
+        <option value="stage08">08 · 肯</option>
+        <option value="stage09">09 · 拜森</option>
+        <option value="stage10">10 · 维加</option>
+        <option value="stage11">11 · 沙加特</option>
+        <option value="stage12">12 · 将军</option>
+      </select>
+      <button id="restart" class="btn" type="button" disabled>重开</button>
+      <button id="fullscreen" class="btn" type="button" disabled>全屏</button>
+      <button id="sound" class="btn" type="button" hidden>启用声音</button>
+    </div>
+    <div class="stage" id="stage" tabindex="-1" aria-label="游戏画面">
+      <canvas id="view" width="768" height="600"></canvas>
+    </div>
+    <div class="gate" id="gate">
+      <h2>载入 ROM，观看春丽实战</h2>
+      <p>Mega Drive · Street Fighter II' – Special Champion Edition (USA)</p>
+      <label class="rom-picker" for="romFile">选择 ROM</label>
+      <input type="file" id="romFile" accept=".md,.gen,.bin,.smd" class="sr-only">
+      <p class="hint">3,145,728 字节 · 文件仅在浏览器本地读取</p>
+      <div class="rom-status" id="romStatus" role="status" hidden></div>
+    </div>
+    <div class="cabinet-foot">
+      <div class="battle-status" id="battleStatus" hidden>
+        <div><span>策略动作</span><strong id="actionLabel">—</strong></div>
+        <div><span>输入延迟</span><strong id="activeDelay">0 帧</strong></div>
+        <button id="holdDelay" class="btn" type="button" aria-pressed="false" title="按住给新输入增加 6 帧延迟"><kbd class="keyboard-hint">空格</kbd> 按住延迟 +6 帧</button>
+      </div>
+      <p class="note" id="note"></p>
+    </div>
+  </section>
+</main>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-hidden="true" aria-label="设置">
+  <div class="drawer-head">
+    <h2>设置</h2>
+    <button id="closeSettings" class="icon" aria-label="关闭">✕</button>
+  </div>
+
+  <div class="drawer-body">
+    <section class="group">
+      <h3>画面</h3>
+      <label class="field">
+        <span>分辨率</span>
+        <select id="resSelect"></select>
+      </label>
+      <p class="hint" id="resHint">扫描线需要 3× 及以上；1×/2× 只放大画面。</p>
+    </section>
+
+    <section class="group">
+      <h3>扫描线</h3>
+      <label class="switch">
+        <input type="checkbox" id="plToggle" checked>
+        <span>启用扫描线滤镜</span>
+      </label>
+      <div class="settings" id="settings">
+        <label class="slider">
+          <span>扫描线强度 <b id="vOpacity">0.95</b></span>
+          <input type="range" id="opacity" min="0" max="1" step="0.05" value="0.95">
+        </label>
+        <label class="slider">
+          <span>去抖动 <b id="vDedither">0.60</b></span>
+          <input type="range" id="dedither" min="0" max="1" step="0.05" value="0.6">
+        </label>
+        <label class="slider">
+          <span>线条柔化 <b id="vSoften">0.30</b></span>
+          <input type="range" id="soften" min="0" max="1" step="0.05" value="0.3">
+        </label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3>对战</h3>
+      <label class="slider">
+        <span>输入延迟 <b id="vDelay">0</b> 帧</span>
+        <input type="range" id="delayFrames" min="0" max="20" step="1" value="0">
+      </label>
+      <label class="slider">
+        <span>抖动概率 <b id="vJitter">5%</b></span>
+        <input type="range" id="jitterP" min="0" max="0.5" step="0.01" value="0.05">
+      </label>
+      <p class="hint">
+        长按画面下方的「按住延迟 +6 帧」可测试输入延迟。
+        <span class="keyboard-hint">也可按住 <kbd>空格</kbd> 增加延迟，或按住 <kbd>Shift</kbd> 暂停提交新输入。</span>
+      </p>
+    </section>
+    <section class="group">
+      <h3>本地关卡存档</h3>
+      <p class="hint">选择网页专用的 stage01.state.gz 等文件。可以一次选多关。</p>
+      <label class="file-label" for="fixtureFiles">选择存档</label>
+      <input type="file" id="fixtureFiles" class="file" accept=".state,.gz" multiple>
+      <output id="fixtureStatus" class="hint"></output>
+    </section>
+  </div>
+</aside>
+
+<script src="app.js?v=18" type="module"></script>
+</body>
+</html>
