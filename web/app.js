@@ -646,10 +646,16 @@ async function boot() {
     handleRom(file);
   });
   el.retryLaunch.addEventListener("click", startBattle);
-  for (const [i, r] of RENDERS.entries()) {
-    el.res.add(new Option(r.label, String(r.r), i === 2, i === 2));
+  // Phones render the 256x200 frame at 2x by default: the 3x canvas costs more
+  // fill rate and is barely visible on a small screen.  Desktops keep 3x.
+  const phoneLike = window.matchMedia("(hover: none) and (pointer: coarse)").matches
+    || (navigator.maxTouchPoints > 0 && window.innerWidth <= 600);
+  const defaultScale = phoneLike ? 2 : 3;
+  for (const r of RENDERS) {
+    el.res.add(new Option(r.label, String(r.r), r.r === defaultScale, r.r === defaultScale));
   }
-  state.renderScale = 3;
+  state.renderScale = defaultScale;
+  el.settings.classList.toggle("disabled", defaultScale < 3);
 
   let glc;
   try {
