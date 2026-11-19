@@ -144,35 +144,47 @@ def per_opponent_chart(summary):
     save(fig, "per-opponent.png")
 
 
-def wins_distribution_chart(runs):
-    fig, ax = plt.subplots(figsize=(9.2, 3.9))
-    style(ax)
-    width = 0.38
-    top = 1
-    for offset, (key, label, color) in zip((-width / 2, width / 2), JITTERS):
+def stop_stages_chart(runs):
+    counts = {}
+    totals = {}
+    for key, label, color in JITTERS:
         jitter = float(key)
-        counts = Counter(run["wins"] for run in runs if abs(run["jitter"] - jitter) < 1e-9)
-        xs = list(range(0, 13))
-        ys = [counts.get(x, 0) for x in xs]
-        top = max(top, max(ys))
-        bars = ax.bar([x + offset for x in xs], ys, width=width, color=color, zorder=3, label=label)
-        for bar, value in zip(bars, ys):
+        subset = [r for r in runs if abs(r["jitter"] - jitter) < 1e-9]
+        totals[key] = len(subset) - sum(1 for r in subset if r["cleared"])
+        per_stage = Counter(len(r["matches"]) for r in subset if not r["cleared"])
+        counts[key] = per_stage
+
+    stages = [12, 11, 10, 9, 8, 7, 6]
+    names = dict((i + 1, zh) for i, (_, zh) in enumerate(STAGES))
+    fig, ax = plt.subplots(figsize=(9.2, 4.2))
+    style(ax)
+    height = 0.38
+    ys = list(range(len(stages)))
+    for offset, (key, label, color) in zip((-height / 2, height / 2), JITTERS):
+        values = [counts[key].get(stage, 0) for stage in stages]
+        bars = ax.barh([y + offset for y in ys], values, height=height, color=color, zorder=3, label=label)
+        for bar, value in zip(bars, values):
             if value:
-                ax.text(bar.get_x() + bar.get_width() / 2, value * 1.12, str(value), ha="center", va="bottom",
-                        fontsize=7.5, color=MUTED)
-    ax.set_yscale("log")
-    ax.set_ylim(0.8, top * 3.2)
-    ax.set_xticks(range(0, 13))
-    ax.set_xlabel("通关场数（12 场全胜才算一币通关）")
-    ax.set_ylabel("次数（对数刻度）")
-    ax.grid(axis="y", color=GRID, linewidth=0.8)
-    ax.legend(frameon=False, fontsize=10)
-    ax.set_title("一币赛程的赢场分布", fontsize=13, pad=12)
-    save(fig, "wins-distribution.png")
+                ax.text(value + 0.12, bar.get_y() + bar.get_height() / 2, str(value), va="center",
+                        fontsize=9.5, color=MUTED)
+    ax.set_yticks(ys)
+    ax.set_yticklabels([f"第 {stage} 场 · {names[stage]}" for stage in stages], fontsize=10)
+    ax.invert_yaxis()
+    peak = max(list(counts["0.0"].values()) + list(counts["0.05"].values()))
+    ax.set_xlim(0, peak + 1.2)
+    ax.set_xlabel("未通关赛程数")
+    ax.grid(axis="x", color=GRID, linewidth=0.8)
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="lower right", frameon=False, fontsize=10)
+    ax.set_title("未通关的赛程止步在哪一场", fontsize=13, pad=30)
+    ax.text(0.5, 1.03,
+            f"100 次赛程中未通关：无抖动 {totals['0.0']} 次，5% 抖动 {totals['0.05']} 次；其余均一币通关",
+            transform=ax.transAxes, ha="center", fontsize=9.5, color=MUTED)
+    save(fig, "stop-stages.png")
 
 
 if __name__ == "__main__":
     summary, runs = load_results()
     clear_rate_chart(summary)
     per_opponent_chart(summary)
-    wins_distribution_chart(runs)
+    stop_stages_chart(runs)
