@@ -7,11 +7,11 @@
 // A session is: boot core -> load ROM from bytes -> unserialize a fixture ->
 // then once per 4 emulator frames: observe, decide, act.
 
-import { Policy } from "./policy.js?v=27";
+import { Policy } from "./policy.js?v=29";
 import { Observer, decodeFrame } from "./observer.js?v=9";
-import { expandAction } from "./actions.js?v=27";
-import { download, withDeadline } from "./assets.js?v=27";
-import { t } from "./i18n.js?v=27";
+import { expandAction } from "./actions.js?v=29";
+import { download, withDeadline } from "./assets.js?v=29";
+import { t } from "./i18n.js?v=29";
 
 const RETRO_MEMORY_SYSTEM_RAM = 2;
 

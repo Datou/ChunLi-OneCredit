@@ -4,23 +4,19 @@
 // frame is pushed through a WebGL2 shader with a configurable
 // scanline effect.
 
-import { VERT, FRAG, UNIFORMS } from "./shader.js?v=15";
-import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=27";
-import { actionLabels } from "./actions.js?v=27";
-import { withDeadline } from "./assets.js?v=27";
-import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=27";
+import { VERT, FRAG, UNIFORMS } from "./shader.js?v=16";
+import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=29";
+import { actionLabels } from "./actions.js?v=29";
+import { withDeadline } from "./assets.js?v=29";
+import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=29";
 
 const NATIVE = { w: 256, h: 200 }; // game pixels after the standard crop
 const FRAME_MS = 1000 / 59.92274340431231;
 const MAX_CATCHUP_FRAMES = 3;
 
-const RENDERS = [
-  { label: "256×200 (1×)", r: 1 },
-  { label: "512×400 (2×)", r: 2 },
-  { label: "768×600 (3×)", r: 3 },
-  { label: "1024×800 (4×)", r: 4 },
-  { label: "1536×1200 (6×)", r: 6 },
-];
+// r = 0 draws one canvas pixel per screen pixel (the scanlines then line up
+// exactly); other values are fixed 256r x 200r canvases.
+const RENDERS = [0, 1, 2, 3, 4, 6];
 
 const $ = (id) => document.getElementById(id);
 
@@ -45,7 +41,6 @@ const el = {
   drawer: $("drawer"),
   romFile: $("romFile"),
   gateTitle: $("gateTitle"),
-  romStatus: $("romStatus"),
   romStatus: $("romStatus"),
   romDetail: $("romDetail"),
   launch: $("launch"),
@@ -204,23 +199,50 @@ function initGL() {
   return { gl, program, texture, uniforms };
 }
 
+const pixelRatio = () => Math.min(window.devicePixelRatio || 1, 2);
+
+/** Canvas size for the current setting; auto matches the on-screen pixels. */
+function canvasSize() {
+  const scale = state.renderScale;
+  if (scale > 0) return { w: NATIVE.w * scale, h: NATIVE.h * scale };
+  const box = el.stage.getBoundingClientRect();
+  if (box.width < 8 || box.height < 8) return null;   // the gate covers the stage
+  const fit = Math.min(box.width / NATIVE.w, box.height / NATIVE.h);
+  const w = Math.max(NATIVE.w, Math.round(NATIVE.w * fit * pixelRatio()));
+  return { w, h: Math.round((w * NATIVE.h) / NATIVE.w) };
+}
+
 function applyResolution() {
-  const r = state.renderScale;
-  el.canvas.width = NATIVE.w * r;
-  el.canvas.height = NATIVE.h * r;
+  const size = canvasSize();
+  if (!size) return;
+  if (el.canvas.width !== size.w) el.canvas.width = size.w;
+  if (el.canvas.height !== size.h) el.canvas.height = size.h;
   updateUniforms();
+}
+
+const resolutionLabel = (r) => (r === 0
+  ? t("res.auto")
+  : `${NATIVE.w * r}×${NATIVE.h * r} (${r}×)`);
+
+function fillResolutionOptions() {
+  const chosen = String(state.renderScale);
+  el.res.replaceChildren();
+  for (const r of RENDERS) {
+    el.res.add(new Option(resolutionLabel(r), String(r), String(r) === chosen, String(r) === chosen));
+  }
+  el.res.value = chosen;
 }
 
 function updateUniforms() {
   const { gl, uniforms } = state;
   if (!gl) return;
-  const r = state.renderScale;
+  const rowsPx = el.canvas.height / NATIVE.h;
 
   gl.useProgram(state.program);
   gl.uniform2f(uniforms.uTexel, 1 / NATIVE.w, 1 / NATIVE.h);
-  gl.uniform1f(uniforms.uPeriod, r);
-  // Matches the shader/py rule: a scanline needs >= 3 output px per game row.
-  gl.uniform1f(uniforms.uActive, el.plToggle.checked && r >= 3 ? 1 : 0);
+  gl.uniform1f(uniforms.uRows, NATIVE.h);
+  // A scanline needs a couple of screen pixels per game row to stay readable.
+  gl.uniform1f(uniforms.uActive, el.plToggle.checked && rowsPx >= 2.5 ? 1 : 0);
   gl.uniform1f(uniforms.uOpacity, Number(el.opacity.value));
   gl.uniform1f(uniforms.uDedither, Number(el.dedither.value));
   gl.uniform1f(uniforms.uSoften, Number(el.soften.value));
@@ -637,6 +659,7 @@ async function boot() {
   onLangChange(() => {
     currentLanguageButton();
     renderDynamic();
+    fillResolutionOptions();
   });
   el.langToggle.addEventListener("click", () => setLang(getLang() === "zh" ? "en" : "zh"));
 
@@ -646,16 +669,13 @@ async function boot() {
     handleRom(file);
   });
   el.retryLaunch.addEventListener("click", startBattle);
-  // Phones render the 256x200 frame at 2x by default: the 3x canvas costs more
-  // fill rate and is barely visible on a small screen.  Desktops keep 3x.
+  // Phones default to a 512x400 canvas; desktops to one canvas pixel per
+  // screen pixel, which is what keeps the scanlines evenly spaced.
   const phoneLike = window.matchMedia("(hover: none) and (pointer: coarse)").matches
     || (navigator.maxTouchPoints > 0 && window.innerWidth <= 600);
-  const defaultScale = phoneLike ? 2 : 3;
-  for (const r of RENDERS) {
-    el.res.add(new Option(r.label, String(r.r), r.r === defaultScale, r.r === defaultScale));
-  }
-  state.renderScale = defaultScale;
-  el.settings.classList.toggle("disabled", defaultScale < 3);
+  state.renderScale = phoneLike ? 2 : 0;
+  fillResolutionOptions();
+  el.settings.classList.toggle("disabled", state.renderScale > 0 && state.renderScale < 3);
 
   let glc;
   try {
@@ -675,6 +695,8 @@ async function boot() {
   Object.assign(state, glc);
 
   applyResolution();
+  new ResizeObserver(() => applyResolution()).observe(el.stage);
+  window.addEventListener("resize", applyResolution);
   startLoop();
   // Fetch the emulator, this stage's save and the policy now, so choosing a ROM
   // afterwards only costs load_game + unserialize.
@@ -683,7 +705,7 @@ async function boot() {
   el.res.addEventListener("change", () => {
     state.renderScale = Number(el.res.value);
     applyResolution();
-    el.settings.classList.toggle("disabled", state.renderScale < 3);
+    el.settings.classList.toggle("disabled", state.renderScale > 0 && state.renderScale < 3);
   });
   el.plToggle.addEventListener("change", updateUniforms);
   for (const s of [el.opacity, el.dedither, el.soften]) {

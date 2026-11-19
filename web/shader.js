@@ -14,7 +14,7 @@ out vec4 outColor;
 
 uniform sampler2D uVideo;
 uniform vec2 uTexel;
-uniform float uPeriod;
+uniform float uRows;
 uniform float uActive;
 uniform float uOpacity;
 uniform float uDedither;
@@ -31,9 +31,11 @@ void main() {
   vec3 nearby = (texture(uVideo, vUv - stepX).rgb + texture(uVideo, vUv + stepX).rgb
                 + texture(uVideo, vUv - stepY).rgb + texture(uVideo, vUv + stepY).rgb) * 0.25;
   vec3 color = mix(center, nearby, 0.5 * uDedither);
-  float separation = abs(fract(gl_FragCoord.y / uPeriod) - 0.5);
+  // Phase is measured in game rows, not output pixels: each of the 200 rows
+  // gets the same shading whether the canvas is 1:1 with the screen or not.
+  float separation = abs(fract(vUv.y * uRows) - 0.5);
   float shade = smoothstep(0.23 - 0.12 * uSoften, 0.5, separation);
   outColor = vec4(color * (1.0 - 0.65 * uOpacity * shade), 1.0);
 }`;
 
-export const UNIFORMS = ["uTexel", "uPeriod", "uActive", "uOpacity", "uDedither", "uSoften"];
+export const UNIFORMS = ["uTexel", "uRows", "uActive", "uOpacity", "uDedither", "uSoften"];
