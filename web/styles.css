@@ -343,6 +343,10 @@ body {
   padding-inline: .65rem;
   border-inline-start: 2px solid #45607d;
 }
+/* Fixed bases: the labels never move when an action name or frame count
+   changes; text is clipped inside the box instead of resizing it. */
+.battle-status div:first-child { flex: 0 1 12.5rem; }
+.battle-status div:nth-child(2) { flex: 0 1 12.5rem; }
 .battle-status div:first-child { border-color: var(--hot); }
 .battle-status strong { font-size: clamp(1rem, 2vw, 1.2rem); }
 #actionLabel { color: #ffdc88; }
@@ -366,6 +370,8 @@ body {
   .gate h2 { max-width: 14ch; }
   .gate { min-height: 20rem; }
   .battle-status div { min-width: 0; padding-inline: .45rem; }
+  .battle-status div:first-child { flex-basis: 5.8rem; }
+  .battle-status div:nth-child(2) { flex-basis: 5.4rem; }
   #holdInput { margin-left: auto; min-height: 2.55rem; }
 }
 #holdInput .hold-active,
