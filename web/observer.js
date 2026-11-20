@@ -21,17 +21,9 @@ const RESIZE_BITS = 11;
 const RESIZE_SCALE = 1 << RESIZE_BITS;
 const RESIZE_ROUND = 1 << (2 * RESIZE_BITS - 1);
 
-const GAUSS5 = (() => {
-  // cv2.GaussianBlur(ksize=5, sigma=0) resolves to getGaussianKernel's
-  // small-gaussian table, i.e. the binomial [1,4,6,4,1]/16 per axis -- not a
-  // sigma=1.1 Gaussian.  Using the wrong kernel shifted the motion mask edges.
-  const k = [1, 4, 6, 4, 1];
-  const out = [];
-  for (let y = 0; y < 5; y++) {
-    for (let x = 0; x < 5; x++) out.push((k[y] * k[x]) / 256);
-  }
-  return out;
-})();
+function reflect101(i, size) {
+  return i < 0 ? -i : i >= size ? 2 * (size - 1) - i : i;
+}
 
 /** Decode one emulator frame into packed RGB888. */
 export function decodeFrame(data, width, height, pitch, format) {
@@ -83,6 +75,25 @@ export function decodeFrame(data, width, height, pitch, format) {
     }
   }
   return out;
+}
+
+/** Match Gym Retro's scenario crop [0, 16, 256, 200] and RGB565 expansion. */
+export function decodePolicyFrame(data, width, height, pitch) {
+  const w = Math.min(width, 256);
+  const top = Math.min(16, height - 1);
+  const h = Math.min(200, height - top);
+  const rgb = new Uint8Array(w * h * 3);
+  for (let y = 0; y < h; y++) {
+    let from = (y + top) * pitch;
+    let to = y * w * 3;
+    for (let x = 0; x < w; x++, from += 2) {
+      const pixel = data[from] | (data[from + 1] << 8);
+      rgb[to++] = (pixel >> 8) & 0xf8;
+      rgb[to++] = (pixel >> 3) & 0xfc;
+      rgb[to++] = (pixel << 3) & 0xf8;
+    }
+  }
+  return { rgb, w, h };
 }
 
 export class Observer {
@@ -143,23 +154,24 @@ export class Observer {
         const d2 = Math.abs(m[2][i] - m[4][i]);
         a[i] = d1 > d2 ? d1 : d2;
       }
-      // 5x5 gaussian (sigma 1.1) with cv2's reflect-101 borders, rounded back
-      // to uint8 like GaussianBlur does on 8-bit input.
+      // Separable [1,4,6,4,1] blur with cv2's reflect-101 borders. Keep the
+      // horizontal sum unrounded so the two passes equal the full 5x5 kernel.
+      const horizontal = new Uint16Array(cw * ch);
       const blur = new Uint8Array(cw * ch);
-      const mirror = (i, n) => (i < 0 ? -i : i >= n ? 2 * (n - 1) - i : i);
       for (let y = 0; y < ch; y++) {
+        const row = y * cw;
         for (let x = 0; x < cw; x++) {
-          let acc = 0;
-          let ki = 0;
-          for (let ky = -2; ky <= 2; ky++) {
-            const yy = mirror(y + ky, ch);
-            for (let kx = -2; kx <= 2; kx++, ki++) {
-              const xx = mirror(x + kx, cw);
-              acc += a[yy * cw + xx] * GAUSS5[ki];
-            }
-          }
-          const v = Math.round(acc);
-          blur[y * cw + x] = v < 0 ? 0 : v > 255 ? 255 : v;
+          horizontal[row + x] = a[row + reflect101(x - 2, cw)] + 4 * a[row + reflect101(x - 1, cw)]
+            + 6 * a[row + x] + 4 * a[row + reflect101(x + 1, cw)] + a[row + reflect101(x + 2, cw)];
+        }
+      }
+      for (let y = 0; y < ch; y++) {
+        const row = y * cw;
+        const above2 = reflect101(y - 2, ch) * cw, above = reflect101(y - 1, ch) * cw;
+        const below2 = reflect101(y + 2, ch) * cw, below = reflect101(y + 1, ch) * cw;
+        for (let x = 0; x < cw; x++) {
+          blur[row + x] = (horizontal[above2 + x] + 4 * horizontal[above + x] + 6 * horizontal[row + x]
+            + 4 * horizontal[below + x] + horizontal[below2 + x] + 128) >> 8;
         }
       }
       // Otsu

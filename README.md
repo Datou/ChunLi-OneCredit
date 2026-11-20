@@ -16,6 +16,8 @@
 
 网页用 WASM 模拟器实时运行同一份权重，并在浏览器本地校验 ROM（SHA-256）。打开页面后会静默预载模拟器、当前关卡存档和策略权重，选 ROM 后通常不到 1 秒即可开打；界面支持中英文切换（右上角 `EN` / `中文`）。桌面按屏幕像素 1:1 渲染以保证扫描线均匀，手机默认 2× 以控制开销。
 
+第 8 关在 5% 抖动的网页留出单场评测中获胜 **43/50**。[Ken 胜率复测](docs/ken-winrate.md)
+
 ## 训练结果
 
 | 冻结权重评测 | 无抖动 | 5% 输入抖动 |
@@ -68,4 +70,4 @@ python -m pip install -r requirements.txt
 
 ## 许可
 
-项目训练、策略和界面代码按 [Apache-2.0](LICENSE) 发布。随网页分发的 Genesis Plus GX 遵循其独立的[非商用许可](web/cores/LICENSE-Genesis-Plus-GX.txt)，对应源码为 [libretro/Genesis-Plus-GX 的固定提交](https://github.com/libretro/Genesis-Plus-GX/tree/b9c2316441978d4015ba30e9a95d9b0e6f8ee981)，[WASM 构建脚本](scripts/build_gx_wasm.ps1)随项目提供。随站附带的网页开局用于实战演示。游戏 ROM 由使用者自行提供。
+项目训练、策略和界面代码按 [Apache-2.0](LICENSE) 发布。网页使用 [Gym Retro v0.8.0 的 Genesis Plus GX 1.7.5](https://github.com/openai/retro/tree/v0.8.0/cores/genesis)，遵循其[非商用许可](web/cores/gym-retro/LICENSE.txt)。仓库保留用于对照的 [1.7.6 源码链接](https://github.com/libretro/Genesis-Plus-GX/tree/b9c2316441978d4015ba30e9a95d9b0e6f8ee981)、[许可](web/cores/LICENSE-Genesis-Plus-GX.txt)和[构建脚本](scripts/build_gx_wasm.ps1)。游戏 ROM 由使用者自行提供。

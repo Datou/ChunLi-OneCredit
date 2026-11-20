@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webDir = resolve(join(here, "..", "web"));
-const coreDir = join(webDir, "cores");
+const coreDir = join(webDir, "cores", "gym-retro");
 
 const arg = (name, dflt) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -23,7 +23,7 @@ const arg = (name, dflt) => {
 const quiet = process.argv.includes("--quiet");
 
 const romPath = arg("rom");
-const fixturePath = arg("fixture", join(coreDir, "fixtures", "stage01_roundstart.state"));
+const fixturePath = arg("fixture", join(webDir, "cores", "fixtures", "gym-retro", "stage01.state.gz"));
 const decisions = Number(arg("decisions", 3000));
 const jitter = Number(arg("jitter", 0));
 const delay = Number(arg("delay", 0));
@@ -51,7 +51,7 @@ globalThis.fetch = async (url, opts) => {
 };
 
 const { Policy } = await import(new URL("../web/policy.js", import.meta.url).href);
-const { Observer, decodeFrame } = await import(new URL("../web/observer.js", import.meta.url).href);
+const { Observer, decodePolicyFrame } = await import(new URL("../web/observer.js", import.meta.url).href);
 const { expandAction } = await import(new URL("../web/actions.js", import.meta.url).href);
 
 // Same ordered delay FIFO as web/live.js InputFifo, duplicated here because
@@ -127,7 +127,8 @@ M._retro_run();
 
 const policy = await Policy.load(join(webDir, "models") + "/");
 const observer = new Observer();
-observer.reset(decodeFrame(frameCopy, cb.w, cb.h, cb.pitch, 2), cb.w, cb.h);
+const opening = decodePolicyFrame(frameCopy, cb.w, cb.h, cb.pitch);
+observer.reset(opening.rgb, opening.w, opening.h);
 
 const fifo = new Fifo(jitter);
 let p2KO = 0, p1KO = 0, frames = 0;
@@ -151,7 +152,8 @@ for (let d = 0; d < decisions; d++) {
     frames++;
   }
 
-  observer.push(decodeFrame(frameCopy, cb.w, cb.h, cb.pitch, 2), cb.w, cb.h, action);
+  const next = decodePolicyFrame(frameCopy, cb.w, cb.h, cb.pitch);
+  observer.push(next.rgb, next.w, next.h, action);
 
   const dead2 = ram16(P2_HP) <= 0 || ram16(P2_HP) >= 0xff00;
   const dead1 = ram16(P1_HP) <= 0 || ram16(P1_HP) >= 0xff00;

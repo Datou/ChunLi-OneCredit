@@ -15,6 +15,7 @@
 #
 # Prerequisites (prepare once):
 #   * libretro/Genesis-Plus-GX checked out at b9c2316441978d4015ba30e9a95d9b0e6f8ee981
+#     or openai/retro v0.8.0's cores/genesis with -GymRetro (current web build)
 #   * make on PATH            (conda: `conda install -c conda-forge make`)
 #   * emcc on PATH            (emsdk: `emsdk install latest && emsdk activate latest`)
 #
@@ -26,7 +27,8 @@
 param(
     [Parameter(Mandatory)][string]$GxRoot,
     [string]$OutDir   = (Join-Path $PSScriptRoot '../web/cores'),
-    [int]$Jobs        = 8
+    [int]$Jobs        = 8,
+    [switch]$GymRetro
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,8 +44,8 @@ Require-Command emcc "install Emscripten (emsdk install latest; emsdk activate l
 Require-Command emar "activate the Emscripten SDK so emar is also on PATH"
 
 if (-not (Test-Path "$GxRoot\Makefile.libretro")) { throw "Genesis Plus GX not found at $GxRoot" }
-foreach ($dep in 'libretro\libretro-common\include', 'libretro\deps\zlib-1.2.11') {
-    if (-not (Test-Path "$GxRoot\$dep")) { throw "missing dependency: $GxRoot\$dep" }
+if (-not (Test-Path "$GxRoot\libretro\libretro-common\include")) {
+    throw "missing libretro-common headers in $GxRoot"
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -70,7 +72,12 @@ Write-Host "== 1/2 compiling core to LLVM bitcode ==" -ForegroundColor Cyan
 Push-Location $GxRoot
 $archive = $null
 try {
-    & make -f Makefile.libretro platform=emscripten CC=emcc CXX=em++ AR=emar -j $Jobs
+    $makeFlags = @('CC=emcc', 'CXX=em++', 'AR=emar')
+    if ($GymRetro) {
+        # Gym Retro v0.8.0's cores/genesis predates Clang's -fno-common default.
+        $makeFlags = @('CC=emcc -fcommon', 'CXX=em++', 'AR=emar', 'HAVE_CHD=0')
+    }
+    & make -f Makefile.libretro platform=emscripten @makeFlags -j $Jobs
     if ($LASTEXITCODE -ne 0) { throw "make failed with exit code $LASTEXITCODE" }
 
     $bc = Get-ChildItem -Path $GxRoot -Filter '*_libretro_emscripten.bc' -Recurse |
@@ -93,7 +100,12 @@ try {
         'lists/string_list.c', 'lists/dir_list.c', 'memmap/memalign.c',
         'string/stdstring.c', 'vfs/vfs_implementation.c'
     ) | ForEach-Object { "$common/$_" }
-    & emcc $archive @support "-I$common/include" -O3 --no-entry -o $outJs `
+    $ports = @()
+    if ($GymRetro) {
+        $support = $support | Where-Object { $_ -match '/streams/' }
+        $ports = @('-s', 'USE_ZLIB=1')
+    }
+    & emcc $archive @support @ports "-I$common/include" -O3 --no-entry -o $outJs `
         -s WASM=1 `
         -s MODULARIZE=1 `
         -s EXPORT_NAME=createGenesisPlusGX `

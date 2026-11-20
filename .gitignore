@@ -14,3 +14,4 @@ __pycache__/
 **/rom.md
 /roms/
 !/web/cores/fixtures/ladder/stage??.state.gz
+!/web/cores/fixtures/gym-retro/stage??.state.gz

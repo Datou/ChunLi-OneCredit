@@ -1,4 +1,5 @@
-// Convert all twelve locally captured training openings to browser fixtures.
+// Rebuild the old 1.7.6 fixtures for comparison. The current web build uses
+// web_pack_retro_states.mjs and the Gym Retro 1.7.5 core instead.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmdirSync, rmSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";

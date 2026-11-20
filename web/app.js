@@ -5,7 +5,7 @@
 // scanline effect.
 
 import { VERT, FRAG, UNIFORMS } from "./shader.js?v=16";
-import { FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=32";
+import { FIXTURE_PATH, FIXTURE_VERSION, LiveSession, prepareCore, prepareFixture, preparePolicy } from "./live.js?v=33";
 import { actionLabels } from "./actions.js?v=29";
 import { withDeadline } from "./assets.js?v=29";
 import { applyI18n, getLang, onLangChange, setLang, t } from "./i18n.js?v=29";
@@ -370,7 +370,7 @@ const ROM_SPEC = {
   size: 3145728,
   sha256: "d9224423c80754a4ee945f7348d7478d56a134654a9389e02cd82caab76dddef",
 };
-const fixtureUrlFor = (stage) => `cores/fixtures/ladder/${stage}.state.gz?v=${FIXTURE_VERSION}`;
+const fixtureUrlFor = (stage) => `${FIXTURE_PATH}${stage}.state.gz?v=${FIXTURE_VERSION}`;
 
 function showRomStatus(key, params = {}, status = "pending", detailKey = null, detailParams = {}) {
   view.rom = { key, params, status, detailKey, detailParams };
@@ -510,7 +510,7 @@ async function warmUp() {
   for (const task of Object.keys(el.launchTasks)) showTask(task, "task.wait");
   try {
     await Promise.all([
-      runTask("core", onProgress => prepareCore("cores/", { onProgress })),
+      runTask("core", onProgress => prepareCore(undefined, { onProgress })),
       runTask("stage", onProgress => prepareFixture(fixtureUrlFor(el.stageSelect.value), { onProgress })),
       runTask("model", onProgress => preparePolicy("models/", { onProgress })),
     ]);

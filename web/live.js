@@ -8,7 +8,7 @@
 // then once per 4 emulator frames: observe, decide, act.
 
 import { Policy } from "./policy.js?v=29";
-import { Observer, decodeFrame } from "./observer.js?v=12";
+import { Observer, decodePolicyFrame } from "./observer.js?v=13";
 import { expandAction } from "./actions.js?v=29";
 import { download, withDeadline } from "./assets.js?v=29";
 import { t } from "./i18n.js?v=29";
@@ -60,7 +60,10 @@ export class InputFifo {
 }
 
 // Bump this whenever a ladder fixture is regenerated.
-export const FIXTURE_VERSION = 4;
+export const FIXTURE_VERSION = 1;
+export const CORE_PATH = "cores/gym-retro/";
+export const FIXTURE_PATH = "cores/fixtures/gym-retro/";
+export const STATE_VERSION = "1.7.5";
 const compiledCores = new Map();
 const policies = new Map();
 const preparations = new Map();
@@ -92,7 +95,7 @@ function prepare(key, start, onProgress) {
 }
 
 /** Fetch, compile and initialise nothing yet: just have the core ready to boot. */
-export function prepareCore(corePath = "cores/", { onProgress } = {}) {
+export function prepareCore(corePath = CORE_PATH, { onProgress } = {}) {
   const wasmUrl = `${corePath}genesis_plus_gx.wasm`;
   return prepare(`core:${wasmUrl}`, report => (async () => {
     const [module] = await Promise.all([
@@ -143,9 +146,10 @@ async function loadCoreScript(url, signal) {
 
 export class LiveSession {
   constructor(opts = {}) {
-    this.corePath = opts.corePath ?? "cores/";
+    this.corePath = opts.corePath ?? CORE_PATH;
     this.modelPath = opts.modelPath ?? "models/";
-    this.fixtureUrl = opts.fixtureUrl ?? `cores/fixtures/ladder/stage01.state.gz?v=${FIXTURE_VERSION}`;
+    this.fixtureUrl = opts.fixtureUrl ?? `${FIXTURE_PATH}stage01.state.gz?v=${FIXTURE_VERSION}`;
+    this.stateVersion = opts.stateVersion ?? STATE_VERSION;
     this.onFrame = opts.onFrame ?? null;
 
     this.M = null;
@@ -252,7 +256,7 @@ export class LiveSession {
 
     if (signal?.aborted) throw signal.reason;
     if (st.length !== M._retro_serialize_size()
-        || new TextDecoder().decode(st.subarray(0, 16)) !== "GENPLUS-GX 1.7.6") {
+        || new TextDecoder().decode(st.subarray(0, 16)) !== `GENPLUS-GX ${this.stateVersion}`) {
       throw new Error(t("fixture.invalid"));
     }
     const sp = M._malloc(st.length);
@@ -359,9 +363,9 @@ export class LiveSession {
   }
 
   async initObserver() {
-    const rgb = decodeFrame(this.frameCopy, this.cb.w, this.cb.h, this.cb.pitch, 2);
+    const { rgb, w, h } = decodePolicyFrame(this.frameCopy, this.cb.w, this.cb.h, this.cb.pitch);
     this.observer = new Observer();
-    this.observer.reset(rgb, this.cb.w, this.cb.h);
+    this.observer.reset(rgb, w, h);
     return this.observer;
   }
 
@@ -433,8 +437,8 @@ export class LiveSession {
     if (this.macroFrame !== 0) return null;
 
     const action = neutral ? 0 : this.action;
-    const rgb = decodeFrame(this.frameCopy, this.cb.w, this.cb.h, this.cb.pitch, 2);
-    this.observer.push(rgb, this.cb.w, this.cb.h, action);
+    const { rgb, w, h } = decodePolicyFrame(this.frameCopy, this.cb.w, this.cb.h, this.cb.pitch);
+    this.observer.push(rgb, w, h, action);
 
     const dead2 = this.p2hp <= 0 || this.p2hp >= 0xff00;
     const dead1 = this.p1hp <= 0 || this.p1hp >= 0xff00;

@@ -1,6 +1,6 @@
 # 存档制作
 
-训练使用 Gym Retro 的 Genesis Plus GX 1.7.5。每份训练存档是 gzip 压缩的原始 core 状态，解压后为 1,036,288 字节，开头为 `GENPLUS-GX 1.7.5`。网页使用 1.7.6，需要另外转换。
+训练与网页使用 Gym Retro 的 Genesis Plus GX 1.7.5。每份训练存档是 gzip 压缩的原始 core 状态，解压后为 1,036,288 字节，开头为 `GENPLUS-GX 1.7.5`。网页文件需要把 x64 存档重新打包为 WASM 的布局。
 
 ## 手动保存第 1 关
 
@@ -37,13 +37,11 @@ python -m chunppo.capture_ladder --model chunli-ppo.zip --offset 87 --jitter 0.0
 
 ## 生成网页存档
 
-网页已经附带 12 份开局。以下流程用于重新生成这些开局，需要 Node.js 和放在约定路径下的 [训练用 ROM](../README.md#运行项目)。
+网页已经附带 12 份开局。用 Node.js 将生成好的可行动训练存档打包到网页目录。
 
 ```bash
-node scripts/web_prepare_ladder.mjs
+node scripts/web_pack_retro_states.mjs generated_states/controllable web/cores/fixtures/gym-retro
 python -m http.server 8765 -d web
 ```
 
-脚本用当前 WASM core 从 ROM 录制模板，保留旧档的工作内存、显存和 VDP 寄存器，使用模板补齐新版运行控制状态，然后验证开局。已经可行动的训练存档保留开局帧。生成的 `web/cores/fixtures/ladder/stage01.state.gz` 至 `stage12.state.gz` 供网页按关自动加载。
-
-这种转换用于建立可打的网页开局。Python 评测使用 Gym Retro 原生训练存档，报告中的胜率对应这一评测环境。
+脚本会检查原始存档的版本、布局、双方血量和输入锁，然后按 WASM 的字段布局重打包。生成的 `web/cores/fixtures/gym-retro/stage01.state.gz` 至 `stage12.state.gz` 保留同一个开局帧。详情见[网页存档兼容性](state-format-compat.md)。
